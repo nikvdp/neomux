@@ -1,0 +1,74 @@
+s() {
+    # split
+    nvr --remote -o "$@"
+}
+
+vs() {
+    # vert split
+    nvr --remote -O "$@"
+}
+
+t() {
+    # tab
+    nvr --remote-tab "$@"
+}
+
+vbcopy() {
+    local register=${1:-@""}
+    local inp
+    inp="$(</dev/stdin)"
+    nvr -c "let @$register=\"$(echo "$inp" | sed -E 's/(["\])/\\\1/g')\""
+}
+
+vbpaste () {
+    local register="${1:-@\"}"
+    nvr --remote-expr "@$register"
+}
+
+abspath() {
+    local in_path
+    if [[ ! "$1" =~ ^/ ]]; then
+        in_path="$PWD/$1"
+    else
+        in_path="$1"
+    fi
+    echo "$in_path"|(
+        IFS=/
+        read -a parr
+        declare -a outp
+        for i in "${parr[@]}"; do
+            case "$i" in
+            ''|.)
+                continue
+                ;;
+            ..)
+                len=${#outp[@]}
+                if ((len == 0))
+                then
+                    continue
+                else
+                    unset outp[$((len-1))] 
+                fi
+                ;;
+            *)
+                len=${#outp[@]}
+                outp[$len]="$i"
+                ;;
+            esac
+        done
+        echo /"${outp[*]}"
+    )
+}
+
+
+vimwindow() {
+    # remote nvim open file $2 in window $1
+    local win="$1"
+    local file="$2"
+    if [[ "$file" == "-" ]]; then
+        # allow piping stdin if '-' passed as filename
+        cat | nvr -cc "${win}wincmd w" --remote -
+    else
+        nvr -cc "${win}wincmd w" -c "e $(abspath "$file")"
+    fi
+}

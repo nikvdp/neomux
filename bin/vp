@@ -1,6 +1,7 @@
-vbpaste () {
-    local register="${1:-@\"}"
-    nvr --remote-expr "@$register"
-}
+#!/usr/bin/env bash
+
+SCRIPT_LOCATION="$( cd "$( dirname "$0" )" && pwd )"
+
+source $SCRIPT_LOCATION/funcs.sh
 
 vbpaste "$@"
