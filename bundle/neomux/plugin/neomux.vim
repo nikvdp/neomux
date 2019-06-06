@@ -18,6 +18,7 @@ function! OpenTerm()
     " add bin folder to the *end* of the path so that nvr or other tools
     " installed by user will take precedence
     let $PATH=printf("%s:%s:%s", l:bin_folder, $PATH, l:platform_bin_folder)
+    echo printf("Folder is: '%s', path is: %s", s:this_folder, $PATH)
     term
 endfunction
 
