@@ -26,6 +26,41 @@ function! WindowNumber()
     return str
 endfunction
 
+function! EnableWinJump(...)
+    let l:key="<C-w>"
+    if a:0 > 0
+        let l:key = a:1
+    endif
+    " Jump directly to different windows
+    " from this SO post: http://stackoverflow.com/questions/6403716/shortcut-for-moving-between-vim-windows
+    let i = 1
+    while i <= 9
+        execute printf('nnoremap %s%s :%swincmd w<CR>', l:key, i, i)
+        if has("nvim")
+            execute printf('tnoremap %s%s <C-\><C-n>:%swincmd w<CR>', l:key, i, i)
+        endif
+        let i = i + 1
+    endwhile
+endfunction
+
+" TODO: replicate window swap
+nnoremap <silent> <leader>ww :call WindowSwap#EasyWindowSwap()<CR>
+
+" Direct window swap mappings (,ww is swap windows)
+map <Leader>s1 ,ww<C-W>1,ww
+map <Leader>s2 ,ww<C-W>2,ww
+map <Leader>s3 ,ww<C-W>3,ww
+map <Leader>s4 ,ww<C-W>4,ww
+map <Leader>s5 ,ww<C-W>5,ww
+map <Leader>s6 ,ww<C-W>6,ww
+map <Leader>s7 ,ww<C-W>7,ww
+map <Leader>s8 ,ww<C-W>8,ww
+map <Leader>s9 ,ww<C-W>9,ww
+
+call EnableWinJump()
+
+" Pnemonic: size-fix. Resize terminal window back to proper size
+map <Leader>sf <Esc><C-j><C-k><C-h><C-l>
 
 " TODO: test airline works as expected
 let win_num_status = '∥ W:[%{WindowNumber()}] ∥'
