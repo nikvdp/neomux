@@ -25,6 +25,30 @@ vbpaste () {
     nvr --remote-expr "@$register"
 }
 
+
+vcd () {
+    # switch *neovim's* working dir to $1
+    local dir="$(abspath "${1:-$PWD}")"
+    nvr -c "chdir $dir"
+}
+
+vpwd() {
+    # print vim's current working dir
+    nvr --remote-expr "getcwd()"
+}
+
+vimwindow() {
+    # remote nvim open file $2 in window $1
+    local win="$1"
+    local file="$2"
+    if [[ "$file" == "-" ]]; then
+        # allow piping stdin if '-' passed as filename
+        cat | nvr -cc "${win}wincmd w" --remote -
+    else
+        nvr -cc "${win}wincmd w" -c "e $(abspath "$file")"
+    fi
+}
+
 abspath() {
     local in_path
     if [[ ! "$1" =~ ^/ ]]; then
@@ -58,17 +82,4 @@ abspath() {
         done
         echo /"${outp[*]}"
     )
-}
-
-
-vimwindow() {
-    # remote nvim open file $2 in window $1
-    local win="$1"
-    local file="$2"
-    if [[ "$file" == "-" ]]; then
-        # allow piping stdin if '-' passed as filename
-        cat | nvr -cc "${win}wincmd w" --remote -
-    else
-        nvr -cc "${win}wincmd w" -c "e $(abspath "$file")"
-    fi
 }
