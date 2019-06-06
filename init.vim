@@ -20,8 +20,19 @@ function! OpenTerm()
     term
 endfunction
 
+function! WindowNumber()
+    let str=tabpagewinnr(tabpagenr())
+    return str
+endfunction
 
 
+" TODO: test airline works as expected
+let win_num_status = '∥ W:[%{WindowNumber()}] ∥'
+if exists("g:airline_theme")
+    let g:airline_section_z = win_num_status . g:airline_section_z
+else
+    let &statusline = &statusline . win_num_status
+endif
 
 """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 """""""""""""""""""""""""""""""""" old version """""""""""""""""""""""""""""""""
