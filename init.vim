@@ -46,8 +46,13 @@ endfunction
 " TODO: replicate window swap
 nnoremap <silent> <leader>ww :call WindowSwap#EasyWindowSwap()<CR>
 
+" Yank current buffer
+map <Leader>by :let s:yanked_buffer=bufnr("%")<CR>:echo "Yanked buffer " . s:yanked_buffer<CR>
+" Paste current buffer
+map <Leader>bp :execute ":b" . s:yanked_buffer<CR>:echo "Pasted buffer " . s:yanked_buffer<CR>
+
 " Direct window swap mappings (,ww is swap windows)
-map <Leader>s1 ,ww<C-W>1,ww
+map <Leader>s1 :let s:buffer_a=bufnr("%")<CR><C-W>1:let s:buffer_b=bufnr("%")<CR>:execute ":b" . s:buffer_a<CR><C-w><C-w>:execute ":b" . s:buffer_b<CR><C-w><C-w>
 map <Leader>s2 ,ww<C-W>2,ww
 map <Leader>s3 ,ww<C-W>3,ww
 map <Leader>s4 ,ww<C-W>4,ww
