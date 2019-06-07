@@ -2,8 +2,8 @@
 noremap <Leader>sh :call OpenTerm()<CR>
 
 let s:this_folder = fnamemodify(resolve(expand('<sfile>:p')), ':h')
-let s:os = systemlist("uname --kernel-name")[0]
-let s:arch = systemlist("uname --machine")[0]
+let s:os = systemlist("uname -s")[0]
+let s:arch = systemlist("uname -m")[0]
 
 function! OpenTerm()
     let l:bin_folder = printf("%s/bin", s:this_folder)
