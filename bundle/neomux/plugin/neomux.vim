@@ -1,9 +1,3 @@
-""" TODO delete
-colorscheme shine
-
-" set leader key to ',' intead of '\'
-let g:mapleader=","
-""" TODO /delete
 
 noremap <Leader>sh :call OpenTerm()<CR>
 
@@ -27,11 +21,9 @@ function! WindowNumber()
     return str
 endfunction
 
+let s:winjump_key = "<C-w>"
 function! EnableWinJump(...)
-    let l:key="<C-w>"
-    if a:0 > 0
-        let l:key = a:1
-    endif
+    let l:key = a:0 > 0 ? a:1 : s:winjump_key
     " Jump directly to different windows
     " from this SO post: http://stackoverflow.com/questions/6403716/shortcut-for-moving-between-vim-windows
     let i = 1
@@ -44,24 +36,30 @@ function! EnableWinJump(...)
     endwhile
 endfunction
 
-" TODO: replicate window swap
-nnoremap <silent> <leader>ww :call WindowSwap#EasyWindowSwap()<CR>
+function! WinSwap(tgt)
+	let src_win=winnr()
+	let src_winbuf=bufnr("%")
+
+	let dst_win=a:tgt
+	execute dst_win . "wincmd w"
+	let dst_buf=bufnr("%")
+
+	execute "b!" . src_winbuf
+	execute l:src_win . "wincmd w"
+	execute "b!" . dst_buf
+	execute l:dst_win . "wincmd w"
+endfunction
+
+let winswap_map_prefix = "<Leader>s"
+for i in [1,2,3,4,5,6,7,8,9]
+	execute printf('map %s%s :call WinSwap("%s")<CR>', winswap_map_prefix, i, i)
+endfor
 
 " Yank current buffer
-map <Leader>by :let s:yanked_buffer=bufnr("%")<CR>:echo "Yanked buffer " . s:yanked_buffer<CR>
+map <Leader>by :let t:yanked_buffer=bufnr("%")<CR>:echo "Yanked buffer " . t:yanked_buffer<CR>
 " Paste current buffer
-map <Leader>bp :execute ":b" . s:yanked_buffer<CR>:echo "Pasted buffer " . s:yanked_buffer<CR>
+map <Leader>bp :execute ":b" . t:yanked_buffer<CR>:echo "Pasted buffer " . t:yanked_buffer<CR>
 
-" Direct window swap mappings (,ww is swap windows)
-map <Leader>s1 :let s:buffer_a=bufnr("%")<CR><C-W>1:let s:buffer_b=bufnr("%")<CR>:execute ":b" . s:buffer_a<CR><C-w><C-w>:execute ":b" . s:buffer_b<CR><C-w><C-w>
-map <Leader>s2 ,ww<C-W>2,ww
-map <Leader>s3 ,ww<C-W>3,ww
-map <Leader>s4 ,ww<C-W>4,ww
-map <Leader>s5 ,ww<C-W>5,ww
-map <Leader>s6 ,ww<C-W>6,ww
-map <Leader>s7 ,ww<C-W>7,ww
-map <Leader>s8 ,ww<C-W>8,ww
-map <Leader>s9 ,ww<C-W>9,ww
 
 call EnableWinJump()
 
