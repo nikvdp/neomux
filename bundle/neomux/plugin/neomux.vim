@@ -37,22 +37,22 @@ function! EnableWinJump(...)
 endfunction
 
 function! WinSwap(tgt)
-	let src_win=winnr()
-	let src_winbuf=bufnr("%")
+    let src_win=winnr()
+    let src_winbuf=bufnr("%")
 
-	let dst_win=a:tgt
-	execute dst_win . "wincmd w"
-	let dst_buf=bufnr("%")
+    let dst_win=a:tgt
+    execute dst_win . "wincmd w"
+    let dst_buf=bufnr("%")
 
-	execute "b!" . src_winbuf
-	execute l:src_win . "wincmd w"
-	execute "b!" . dst_buf
-	execute l:dst_win . "wincmd w"
+    execute "b!" . src_winbuf
+    execute l:src_win . "wincmd w"
+    execute "b!" . dst_buf
+    execute l:dst_win . "wincmd w"
 endfunction
 
 let winswap_map_prefix = "<Leader>s"
 for i in [1,2,3,4,5,6,7,8,9]
-	execute printf('map %s%s :call WinSwap("%s")<CR>', winswap_map_prefix, i, i)
+    execute printf('map %s%s :call WinSwap("%s")<CR>', winswap_map_prefix, i, i)
 endfor
 
 " Yank current buffer
