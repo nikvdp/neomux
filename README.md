@@ -62,7 +62,7 @@ to streamline working with neovim.
 The most commonly used ones are: `vw` (vim window), `vp` (vim paste) and `vc` (vim copy).
 
 
-- `vw <win_num> <file>` - open a file in a vim window. For example:
+- `vw <win_num> <file>` - open `<file>` in a vim window. For example:
 
   ``` bash
   vw 2 ~/.config/nvim/init.vim 
