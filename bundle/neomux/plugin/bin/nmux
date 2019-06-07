@@ -1,0 +1,2 @@
+#!/usr/bin/env bash
+nvr -cc vsplit --remote-wait "$@"
