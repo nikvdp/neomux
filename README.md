@@ -1,6 +1,7 @@
 # Neomux
 
-Everything awesome about tmux, but in neovim.
+Everything awesome about tmux, but in neovim. 
+
 
 # Installation
 
@@ -11,6 +12,18 @@ Everything awesome about tmux, but in neovim.
 
 
 # Usage
+
+## Recommended workflow
+
+Neomux is meant to replace tools like tmux -- instead of relying on tmux or a
+fancy tabbed terminal emulator to run multiple shell windows (many of which, if
+you're anything like me, have instances of nvim running inside of them) you can
+instead just have one neovim session open and run your shells inside neovim.
+Vim has great tab and window splitting support, so you can rely on (neo)vim's
+mature window and tab management workflow to make flipping between the files
+you're editing and your shell(s) painless. Files and shells are both
+first-class citizens, and all the tools you need to pass data between neovim
+and your shell are included.
 
 ## Window navigation
 
