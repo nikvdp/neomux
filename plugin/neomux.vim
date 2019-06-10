@@ -1,5 +1,9 @@
 
 command Neomux call NeomuxTerm()
+" Make getting out of terminal windows work the same way it does for every
+" other window. If you really need to input <C-w> to a term window, use
+" `:call NeomuxSendCtrlW()`
+tnoremap <C-w> <C-\><C-n><C-w>
 
 noremap <Leader>sh :Neomux<CR>
 
@@ -15,7 +19,7 @@ function! NeomuxTerm()
     " installed by user will take precedence
     let $PATH=printf("%s:%s:%s", l:bin_folder, $PATH, l:platform_bin_folder)
     let $EDITOR=printf("%s/nmux", l:bin_folder)
-    term
+    term!
 endfunction
 
 function! WindowNumber()
