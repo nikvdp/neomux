@@ -44,8 +44,10 @@ Neomux adds new mappings to work with windows (They are accessed via the
 
 ## CLI helpers
 
-You can start a neomux shell in a neovim window with the usual `:term` or with
+You can start a neomux shell in a neovim window with `:Neomux` or with
 the mapping `<Leader>sh`.
+
+**Terminals started via other methods (e.g. `:term`) will not have neomux functionality!**
 
 > **NOTE:**
 >

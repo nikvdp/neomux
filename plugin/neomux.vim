@@ -1,11 +1,13 @@
 
-noremap <Leader>sh :call OpenTerm()<CR>
+command Neomux call NeomuxTerm()
+
+noremap <Leader>sh :Neomux<CR>
 
 let s:this_folder = fnamemodify(resolve(expand('<sfile>:p')), ':h')
 let s:os = systemlist("uname -s")[0]
 let s:arch = systemlist("uname -m")[0]
 
-function! OpenTerm()
+function! NeomuxTerm()
     let l:bin_folder = printf("%s/bin", s:this_folder)
     let l:platform_bin_folder = printf("%s/%s.%s.bin", s:this_folder, s:os, s:arch)
 
