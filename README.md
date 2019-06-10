@@ -34,7 +34,7 @@ This number identifies every window on the screen and is how you refer to
 individual windows in neomux.
 
 Neomux adds new mappings to work with windows (They are accessed via the 
-`<Leader>` key, which is `,` on a vanilla neovim install):
+`<Leader>` key, which is `\` on a vanilla neovim install):
 
 - `<Leader>w[1-9]` - move the cursor directly to the window specified (e.g.
   `<Leader>w3` wouldmove the cursor to window 3)
