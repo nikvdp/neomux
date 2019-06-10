@@ -1,5 +1,7 @@
 
-command Neomux call NeomuxTerm()
+command! Neomux call NeomuxTerm()
+
+
 " Make getting out of terminal windows work the same way it does for every
 " other window. If you really need to input <C-w> to a term window, use
 " `:call NeomuxSendCtrlW()`
@@ -66,6 +68,13 @@ map <Leader>by :let t:yanked_buffer=bufnr("%")<CR>:echo "Yanked buffer " . t:yan
 " Paste current buffer
 map <Leader>bp :execute ":b" . t:yanked_buffer<CR>:echo "Pasted buffer " . t:yanked_buffer<CR>
 
+function! NeomuxSendCtrlW()
+    call chansend(b:terminal_job_id, "")
+endfunction
+
+function! NeomuxSend(keys)
+    call chansend(b:terminal_job_id, a:keys)
+endfunction
 
 call EnableWinJump()
 
