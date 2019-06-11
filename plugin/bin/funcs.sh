@@ -37,6 +37,14 @@ vpwd() {
     nvr --remote-expr "getcwd()"
 }
 
+vim-window-print() {
+    # vim-window-print: send contents of a window out to stdout
+    local win="$1"
+    local oldwin="$(nvr --remote-expr 'tabpagewinnr(tabpagenr())')"
+    nvr -cc "${win}wincmd w" --remote-expr 'join(getline(1,"$"), "\n")' -c "${oldwin}wincmd w"
+    nvr --remote-send a
+}
+
 vimwindow() {
     # remote nvim open file $2 in window $1
     local win="$1"
