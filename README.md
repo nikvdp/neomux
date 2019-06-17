@@ -1,6 +1,6 @@
 # Neomux
 
-Everything awesome about tmux, but in neovim. 
+Everything awesome about tmux, but in [neovim][neovim]. 
 
 
 # Installation
@@ -12,6 +12,20 @@ Everything awesome about tmux, but in neovim.
 
 
 # Usage
+
+You can start a neomux shell in a neovim window with `:Neomux` or with
+the mapping `<Leader>sh`.
+
+**Terminals started via other methods (e.g. `:term`) will not have neomux functionality!**
+
+> **NOTE:**
+>
+> Neomux will automatically tell the shell to use your current neovim session as
+> the default editor via the `$EDITOR` shell variable. This means that tools like
+> `git` and `kubectl` will open files in your existing neovim session. Make sure you 
+> use neovim's `:bd` (buffer delete) command when you are finished editing your
+> files to notify the calling program you are done -- this is equivalent to
+> closing a non-neomux editor. 
 
 ## Recommended workflow
 
@@ -28,7 +42,11 @@ and your shell are included.
 ## Window navigation
 
 After installing neovim you will notice that every window in vim now shows a numeric
-identifier in it's status bar that looks like this: `∥ W:1 ∥`.
+identifier in it's status bar that looks like this: 
+
+``` 
+∥ W:1 ∥
+```
 
 This number identifies every window on the screen and is how you refer to
 individual windows in neomux.
@@ -42,21 +60,107 @@ Neomux adds new mappings to work with windows (They are accessed via the
 - `<C-s>` - Exit insert mode while in a neomux shell. This is just an alias for
   `<C-\><C-n>` which is the default keymap to end insert mode.
 
+## Tutorial
+
+All neomux terminals come pre-loaded with some handy new shell commands.
+
+### Opening files in new windows: `s`, `vs`, and (kind of) `t`
+
+
+<p align="center">
+<img width="75%" style="width: 400px; height: 400px;" src="https://srv.nikvdp.com/neomux/opening-files.gif">
+</p>
+
+The simplest of the new neomux shell commands are `s`, `vs` and `t`. These
+stand for `s`plit, `v`ertical-`s`plit, and `t`ab, and are straightforward to use.
+
+If you have a neomux shell open and wanted to open a file you were looking at 
+in a *new* window, you would simply do:
+
+``` sh
+s <some-file>
+```
+
+Similarly, `vs <some-file>`, and `t <some-file>` would open `<some-file>` in 
+a vertical split, or a new tab, respectively.
+
+
+### Working with windows by window-number: `vw` and `vwp`
+
+<p align="center">
+<img width="75%" style="width: 400px; height: 400px;" src="https://srv.nikvdp.com/neomux/windows.svg">
+</p>
+
+<!--
+<div style="text-align: center;"> <script id="asciicast-251096" src="https://asciinema.org/a/251096.js" async></script> </div>
+-->
+
+
+One of the most commonly used neomux commands is `vw` (vim-window), it allows
+you to open a file in an *already open* window.
+
+For example if you have 3 windows open in your current nvim session/tab and you 
+wanted to open a file named `my-file.txt` in the 2nd window you'd do:
+
+``` sh
+vw 2 my-file.txt
+```
+
+You can also use pass `-` as the filename to stream the contents of `stdin`
+into a vim-window, which when combined with the shell's `|` characters makes
+for some interesting possibilities. 
+
+The `vwp` (vim-window-print) command does the reverse of the `vw` command. It
+takes the contents of any vim window and streams it out to standard out. When
+you combine this with your shell's [process substition][process-substition]
+functionality, you can do some interesting things such as interactively working
+on a bash script without having to first write it to a file. Check out vid above
+for more details
+
+### Copying/yanking and pasting text to and from neomux
+<div style="text-align: center;"> <script id="asciicast-251108" src="https://asciinema.org/a/251108.js" async></script> </div>
+
+
+Neomux comes with two helpers for working with vim's registers to copy and paste
+text: `vc` and `vp`, which stand for vim-copy and vim-paste respectively.
+
+With these, you can manipulate the contents of vim's yank ring and registers
+from the command line. If you're not familiar with vim's register system, I
+recommend first checking out [vim's documentation on the
+topic][vim-registers-docs] and/or [this tutorial][vim-registers-tut].
+
+Both `vc` and `vp`, work on the default register (`@"`) if no register is
+specified.  To work with a specific register just pass it as the first cmd-line
+param. For example, to work with register `a` (`@a`), you would use `vw a`, and
+`vp a`. 
+
+To put data in a register pipe it in via stdin:
+
+``` sh
+$ echo "This is what's in register a." | vc a
+```
+
+And get it out with `vp`:
+
+``` sh
+$ vp a
+This is what's in register a. 
+```
+
+All vim register semantics are preserved, so you can append to the contents of a 
+register by capitalizing the register name:
+
+``` sh
+$ echo " Appended to register a." | vc A
+$ vp a
+This is what's in register a. Appended to register a.
+```
+
+Special registers such as `/` and `+` work just like any other register, so
+you could even use these as a replacement for `pbpaste` / `xsel` by using `vp
++`. 
+
 ## CLI helpers
-
-You can start a neomux shell in a neovim window with `:Neomux` or with
-the mapping `<Leader>sh`.
-
-**Terminals started via other methods (e.g. `:term`) will not have neomux functionality!**
-
-> **NOTE:**
->
-> Neomux will automatically tell the shell to use your current neovim session as
-> the default editor via the `$EDITOR` shell variable. This means that tools like
-> `git` and `kubectl` will open files in your existing neovim session. Make sure you 
-> use neovim's `:bd` (buffer delete) command when you are finished editing your
-> files to notify the calling program you are done -- this is equivalent to
-> closing a non-neomux editor. 
 
 When you start a neomux shell some new helper commands will be available to you
 to streamline working with neovim.
@@ -64,7 +168,9 @@ to streamline working with neovim.
 The most commonly used ones are: `vw` (vim window), `vp` (vim paste) and `vc` (vim copy).
 
 
-- `vw <win_num> <file>` - open `<file>` in a vim window. For example:
+- ### `vw <win_num> <file>` 
+
+  Open `<file>` in a vim window. For example:
 
   ``` bash
   vw 2 ~/.config/nvim/init.vim 
@@ -116,5 +222,10 @@ The most commonly used ones are: `vw` (vim window), `vp` (vim paste) and `vc` (v
 Coming soon...
 
 [vim-plug]: https://github.com/junegunn/vim-plug 
+[tmux]: https://github.com/tmux/tmux
 [neovim-remote]: https://github.com/mhinz/neovim-remote
+[vim-registers-docs]: http://vimdoc.sourceforge.net/htmldoc/change.html#registers
+[vim-registers-tut]: https://www.brianstorti.com/vim-registers/
+[neovim]: https://neovim.io
+[process-substition]: https://en.wikipedia.org/wiki/Process_substitution
 
