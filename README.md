@@ -1,7 +1,26 @@
+
 # Neomux
 
 Everything awesome about tmux, but in [neovim][neovim]. 
 
+<!-- START doctoc generated TOC please keep comment here to allow auto update -->
+<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
+
+
+- [Installation](#installation)
+- [Usage](#usage)
+  - [Basics](#basics)
+  - [Window navigation](#window-navigation)
+  - [Key bindings](#key-bindings)
+- [Tutorial](#tutorial)
+    - [Opening files in new windows: `s`, `vs`, and (kind of) `t`](#opening-files-in-new-windows-s-vs-and-kind-of-t)
+    - [Working with windows by window-number: `vw` and `vwp`](#working-with-windows-by-window-number-vw-and-vwp)
+    - [Copying/yanking and pasting text to and from neomux](#copyingyanking-and-pasting-text-to-and-from-neomux)
+- [CLI helpers](#cli-helpers)
+- [Cookbook](#cookbook)
+- [Customization](#customization)
+
+<!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
 # Installation
 
@@ -13,6 +32,17 @@ Everything awesome about tmux, but in [neovim][neovim].
 
 # Usage
 
+Neomux is meant to replace tools like tmux -- instead of relying on tmux or a
+fancy tabbed terminal emulator to run multiple shell windows (many of which, if
+you're anything like me, have instances of nvim running inside of them) you can
+instead just have one neovim session open and run your shells inside neovim.
+Vim has great tab and window splitting support, so you can rely on (neo)vim's
+mature window and tab management workflow to make flipping between the files
+you're editing and your shell(s) painless. Files and shells are both
+first-class citizens, and all the tools you need to pass data between neovim
+and your shell are included.
+
+## Basics 
 You can start a neomux shell in a neovim window with `:Neomux` or with
 the mapping `<Leader>sh`.
 
@@ -27,17 +57,7 @@ the mapping `<Leader>sh`.
 > files to notify the calling program you are done -- this is equivalent to
 > closing a non-neomux editor. 
 
-## Recommended workflow
 
-Neomux is meant to replace tools like tmux -- instead of relying on tmux or a
-fancy tabbed terminal emulator to run multiple shell windows (many of which, if
-you're anything like me, have instances of nvim running inside of them) you can
-instead just have one neovim session open and run your shells inside neovim.
-Vim has great tab and window splitting support, so you can rely on (neo)vim's
-mature window and tab management workflow to make flipping between the files
-you're editing and your shell(s) painless. Files and shells are both
-first-class citizens, and all the tools you need to pass data between neovim
-and your shell are included.
 
 ## Window navigation
 
@@ -51,24 +71,29 @@ identifier in it's status bar that looks like this:
 This number identifies every window on the screen and is how you refer to
 individual windows in neomux.
 
-Neomux adds new mappings to work with windows (They are accessed via the 
-`<Leader>` key, which is `\` on a vanilla neovim install):
+## Key bindings
+
+Neomux adds some new key mappings to make working with windows easier. Some are
+accessed via the `<Leader>` key by default (`\` on a vanilla neovim install):
 
 - `<Leader>w[1-9]` - move the cursor directly to the window specified (e.g.
   `<Leader>w3` wouldmove the cursor to window 3)
-- `<Leader>s[1-9]` - swap the current window with another window. (e.g. `<Leader>s3` would make your current window switch places with whatever is in window #3)
+- `<Leader>s[1-9]` - swap the current window with another window. (e.g.
+  `<Leader>s3` would make your current window switch places with window #3)
 - `<C-s>` - Exit insert mode while in a neomux shell. This is just an alias for
   `<C-\><C-n>` which is the default keymap to end insert mode.
 
-## Tutorial
+# Tutorial
 
-All neomux terminals come pre-loaded with some handy new shell commands.
+An extended version of this tutorial is available in the [introducing
+neomux][neomux-blog-post] blog post.  All neomux terminals come pre-loaded with
+some handy new shell commands.
 
 ### Opening files in new windows: `s`, `vs`, and (kind of) `t`
 
 
 <p align="center">
-<img width="75%" style="width: 400px; height: 400px;" src="https://srv.nikvdp.com/neomux/opening-files.gif">
+  <img width="75%" src="https://srv.nikvdp.com/neomux/1.gif">
 </p>
 
 The simplest of the new neomux shell commands are `s`, `vs` and `t`. These
@@ -88,7 +113,7 @@ a vertical split, or a new tab, respectively.
 ### Working with windows by window-number: `vw` and `vwp`
 
 <p align="center">
-<img width="75%" style="width: 400px; height: 400px;" src="https://srv.nikvdp.com/neomux/windows.svg">
+  <img width="75%" src="https://srv.nikvdp.com/neomux/2.gif">
 </p>
 
 <!--
@@ -118,7 +143,9 @@ on a bash script without having to first write it to a file. Check out vid above
 for more details
 
 ### Copying/yanking and pasting text to and from neomux
-<div style="text-align: center;"> <script id="asciicast-251108" src="https://asciinema.org/a/251108.js" async></script> </div>
+<p align="center">
+  <img width="75%" src="https://srv.nikvdp.com/neomux/3.gif">
+</p>
 
 
 Neomux comes with two helpers for working with vim's registers to copy and paste
@@ -160,12 +187,10 @@ Special registers such as `/` and `+` work just like any other register, so
 you could even use these as a replacement for `pbpaste` / `xsel` by using `vp
 +`. 
 
-## CLI helpers
+# CLI helper reference
 
 When you start a neomux shell some new helper commands will be available to you
 to streamline working with neovim.
-
-The most commonly used ones are: `vw` (vim window), `vp` (vim paste) and `vc` (vim copy).
 
 
 - ### `vw <win_num> <file>` 
@@ -185,7 +210,8 @@ The most commonly used ones are: `vw` (vim window), `vp` (vim paste) and `vc` (v
   ``` bash
   ls | vw 2 -
   ```
-- `vc [register]` - copy data into a vim register (`@"` if no register specified). Example:
+- ### `vc [register]` 
+  copy data into a vim register (`@"` if no register specified). Example:
 
   ``` bash
   ls | vc a
@@ -194,16 +220,22 @@ The most commonly used ones are: `vw` (vim window), `vp` (vim paste) and `vc` (v
   Would put the listing of files in the shell's working directory into vim register `a`, 
   which you could then paste in vim by doing e.g. `"aP`
 
-- `vp [register]` - paste data from a vim register (`@"` if no register specified).
-- `s <file>` - Open `<file>` in a horizontal split.
-- `vs <file>` - Open `<file>` in a vertical split.
-- `t <file>` - Open `<file>` in a new tab.
-- `vcd <path>` - Switch neovim's working dir to `<path>`.
-- `vpwd` - Print neovim's working dir. Useful with `cd "$(vpwd)"` to move the
-  shell to neovim's current working dir.
+- ### `vp [register]`
+  paste data from a vim register (`@"` if no register specified).
+- ### `s <file>`
+  Open `<file>` in a horizontal split.
+- ### `vs <file>`
+  Open `<file>` in a vertical split.
+- ### `t <file>`
+  Open `<file>` in a new tab.
+- ### `vcd <path>`
+  Switch neovim's working dir to `<path>`.
+- ### `vpwd`
+  Print neovim's working dir.  Useful with `cd "$(vpwd)"` to move the shell to
+  neovim's current working dir.
 
 
-## Cookbook
+# Cookbook
 
 - A useful pattern is to combine `vw`, `vp`, and `xargs` to do
   operations over sets of files. For example, if you wanted to delete all files in a folder 
@@ -228,4 +260,4 @@ Coming soon...
 [vim-registers-tut]: https://www.brianstorti.com/vim-registers/
 [neovim]: https://neovim.io
 [process-substition]: https://en.wikipedia.org/wiki/Process_substitution
-
+[neomux-blog-post]: https://nikvdp.com/post/neomux
