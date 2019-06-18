@@ -317,6 +317,7 @@ Configure neomux by setting any of these variables in your `.vimrc` / `init.vim`
 
 ### Other config
 
+- `g:neomux_default_shell` - Default: the value of your system's `$SHELL` env var. Neomux starts with the default shell for your user, but if you want to override this to force Neomux terminals to run bash/zsh/your-preferred-shell, set this var in your `.vimrc`/`init.vim`. E.g., if you want Neomux shells to start zsh, you would put `let g:neomux_default_shell = "zsh"` in your `init.vim`.
 - `g:neomux_win_num_status` - Default: `∥ W:[%{WindowNumber()}] ∥`. By default
   Neomux adds decorations that look like `∥ W:1 ∥` to each window. If you'd like
   to customize this, set this variable to a different value. `%{WindowNumber()}`

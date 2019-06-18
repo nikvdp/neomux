@@ -15,6 +15,7 @@ if !exists('g:neomux_paste_buffer_map') | let g:neomux_paste_buffer_map = '<Lead
 if !exists('g:neomux_term_sizefix_map') | let g:neomux_term_sizefix_map = '<Leader>sf'  | endif
 if !exists('g:neomux_win_num_status') | let g:neomux_win_num_status = '∥ W:[%{WindowNumber()}] ∥' | endif
 if !exists('g:neomux_exit_term_mode_map') | let g:neomux_exit_term_mode_map = '<C-s>' | endif
+if !exists('g:neomux_default_shell') | let g:neomux_default_shell = $SHELL | endif
 
 
 " Make getting out of terminal windows work the same way it does for every
@@ -37,7 +38,11 @@ let s:this_folder = fnamemodify(resolve(expand('<sfile>:p')), ':h')
 let s:os = systemlist("uname -s")[0]
 let s:arch = systemlist("uname -m")[0]
 
-function! NeomuxTerm()
+function! NeomuxTerm(...)
+    if a:0 > 0
+        let l:term_cmd = a:1
+    endif
+
     let l:bin_folder = printf("%s/bin", s:this_folder)
     let l:platform_bin_folder = printf("%s/%s.%s.bin", s:this_folder, s:os, s:arch)
 
@@ -45,7 +50,12 @@ function! NeomuxTerm()
     " installed by user will take precedence
     let $PATH=printf("%s:%s:%s", l:bin_folder, $PATH, l:platform_bin_folder)
     let $EDITOR=printf("%s/nmux", l:bin_folder)
-    term!
+
+    if exists("l:term_cmd")
+        execute printf("term! %s", l:term_cmd) 
+    else
+        execute printf("term! %s", g:neomux_default_shell)
+    endif
 endfunction
 
 function! WindowNumber()
