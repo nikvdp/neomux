@@ -5,15 +5,16 @@ Contents ~
 
  1. Introduction                                          |neomux-introduction|
  2. Installation                                          |neomux-installation|
- 3. Usage                                                        |neomux-usage|
+ 3. Quickstart                                              |neomux-quickstart|
+ 4. Usage                                                        |neomux-usage|
   1. Basics                                                     |neomux-basics|
   2. Window navigation                               |neomux-window-navigation|
   3. Key bindings                                         |neomux-key-bindings|
- 4. Tutorial                                                  |neomux-tutorial|
+ 5. Tutorial                                                  |neomux-tutorial|
    1. Opening files in new windows: |s|, 'vs', and (kind of) 't'
    2. Working with windows by window-number: |vw| and 'vwp'
    3. Copying/yanking and pasting text to and from neomux |copying-yanking-pasting-text-to-from-neomux|
- 5. CLI helper reference                          |neomux-cli-helper-reference|
+ 6. CLI helper reference                          |neomux-cli-helper-reference|
    1. 'vw <win_num> <file>'                                   |vw-win_num-file|
    2. 'vp [register]'                                             |vp-register|
    3. 's <file>'                                                       |s-file|
@@ -21,30 +22,18 @@ Contents ~
    5. 't <file>'                                                       |t-file|
    6. 'vcd <path>'                                                   |vcd-path|
    7. |vpwd|
- 6. Cookbook                                                  |neomux-cookbook|
- 7. Customization                                        |neomux-customization|
- 8. References                                              |neomux-references|
+ 7. Cookbook                                                  |neomux-cookbook|
+ 8. Customization                                        |neomux-customization|
+   1. Key bindings:
+   2. Other config                                        |neomux-other-config|
+   3. Misc / scripting                                  |neomux-misc-scripting|
+ 9. References                                              |neomux-references|
 
 ===============================================================================
                                                           *neomux-introduction*
 Introduction ~
 
 Everything awesome about tmux, but in neovim [1].
-
-- Installation
-- Usage
-- Basics
-- Window navigation
-- Key bindings
-- Tutorial
-
-  - Opening files in new windows: |s|, 'vs', and (kind of) 't'
-  - Working with windows by window-number: |vw| and 'vwp'
-  - Copying/yanking and pasting text to and from neomux
-
-- CLI helpers
-- Cookbook
-- Customization
 
 ===============================================================================
                                                           *neomux-installation*
@@ -54,6 +43,15 @@ Installation ~
 2. Install this plugin into neovim via your favorite plugin manager (vim-
    plug [2] is a good place to start)
 3. (Optional, for speed) install neovim-remote [3].
+
+===============================================================================
+                                                            *neomux-quickstart*
+Quickstart ~
+
+Install neomux, start a shell with ':NeomuxTerm' , and use 'vw <win_num>
+<file>' and friends to open files in vim windows from the shell.
+
+For more info see the tutorial.
 
 ===============================================================================
                                                                  *neomux-usage*
@@ -104,17 +102,33 @@ individual windows in neomux.
                                                           *neomux-key-bindings*
 Key bindings ~
 
-Neomux adds some new key mappings to make working with windows easier. Some are
-accessed via the '<Leader>' key by default ('\' on a vanilla neovim install):
+Neomux adds some new key mappings to make working with windows easier.
+Keybindings can be modified from your 'vimrc' / 'init.vim', see customization
+for more info.
 
-- '<Leader>w[1-9]' - move the cursor directly to the window specified (e.g.
-  '<Leader>w3' wouldmove the cursor to window 3)
+In the default settings some commands are accessed via the '<Leader>' key ('\'
+on a vanilla neovim install):
+
+- '<Leader>sh' - Start a new neomux term in the current window.
+
+- '<C-w>[1-9]' - move the cursor directly to the window specified (e.g.
+  '<C-w>w3' wouldmove the cursor to window 3)
 
 - '<Leader>s[1-9]' - swap the current window with another window. (e.g.
   '<Leader>s3' would make your current window switch places with window #3)
 
 - '<C-s>' - Exit insert mode while in a neomux shell. This is just an alias
   for '<C-\><C-n>' which is the default keymap to end insert mode.
+
+- '<Leader>sf' - size-fix. If you re-arrange windows neovim's terminal
+  sometimes doesn't automatically resize the terminal to match the new
+  window's size. This keymapping should refresh.
+
+- '<Leader>by' - yank buffer. Sometimes it's handy to be able to yank a
+  buffer and paste it into a new window (I often use this if I want to move a
+  window to a new tab). Yanked buffers can be pasted with '<Leader>bp'.
+
+- '<Leader>bp' - paste a previously yanked buffer into a window.
 
 ===============================================================================
                                                               *neomux-tutorial*
@@ -282,7 +296,73 @@ files and yank to the `@"` register with `ggVGy`... vp | xargs rm #'
                                                          *neomux-customization*
 Customization ~
 
-Coming soon...
+Neomux comes with a sane (to me) set of defaults, but it's meant to get out of
+your way, so much of it's behavior is configurable.
+
+Configure neomux by setting any of these variables in your 'vimrc' /
+'init.vim':
+
+-------------------------------------------------------------------------------
+Key bindings: ~
+
+- 'g:neomux_start_term_map' - Default: '<Leader>sh'. This map controls what
+  keys start a new Neomux term in the current window.
+
+- 'g:neomux_winjump_map_prefix' - Default: '<C-w><win_num>'. In Neomux you
+  can jump to any open window by hitting '<C-w><win_num>' (e.g. '<C-w>2'
+  jumps to window 2. Change this if you want to jump to a different window
+  with a different mapping. NOTE: this is a prefix map, so whatever key you
+  specify will have 9 new mappings generated, one for each window. E.g. if
+  you change this to '<C-b>', you would hit '<C-b>2' to move to window 2.
+
+- 'g:neomux_winswap_map_prefix' - Default: '<Leader>s<win_num>'. You can swap
+  the current window with any other window by hitting '<Leader>s<win_num>'.
+  Change this if you don't want to use '<Leader>s' for this map. Like
+  'g:neomux_winjump_map_prefix', this is a prefix map, so if you change it to
+  '<Leader>b' it would create 9 new mappings, and you'd swap current window
+  with what's in window #2 with '<C-b>2'.
+
+- 'g:neomux_yank_buffer_map' - Default: '<Leader>by'. Yank a buffer to be
+  pasted later.
+
+- 'g:neomux_paste_buffer_map' - Default: '<Leader>bp'. Paste a previously
+  yanked buffer.
+
+- 'g:neomux_term_sizefix_map' - Default: '<Leader>sf'. Fix a neomux term
+  window that is the wrong size
+
+- 'g:neomux_exit_term_mode_map' - Default: '<C-s>'. Get out of insert mode
+  when inside a neomux terminal window.
+
+-------------------------------------------------------------------------------
+                                                          *neomux-other-config*
+Other config ~
+
+- 'g:neomux_win_num_status' - Default: '∥ W:[%{WindowNumber()}] ∥'. By
+  default Neomux adds decorations that look like '∥ W:1 ∥' to each window. If
+  you'd like to customize this, set this variable to a different value.
+  '%{WindowNumber()}' will be replaced by the window number itself.
+
+- 'g:neomux_dont_fix_term_ctrlw_map' - By default you can't get out of a
+  neovim terminal window with '<C-w>' the way you can from a normal vim
+  window. Neomux modifies the default mappings so that '<C-w>' works the same
+  way in a terminal window as it does a normal window. Neomux includes a
+  'NeomuxSendCtrlW()' helper function which you can use to send '<C-w>' to a
+  terminal (':call NeomuxSendCtrlW()'), however if you find yourself needing
+  to use '<C-w>' often, you can restore neovim's default settings by setting
+  'g:neomux_dont_fix_term_ctrlw_map' to '1'.
+
+- 'g:neomux_no_exit_term_map' - By default neomux adds a new mapping
+  (configured via 'g:neomux_exit_term_mode_map') to easily get out of a
+  neovim/neomux terminal window. If you don't want this mapping to be set at
+  all, you can disable it by setting 'g:neomux_no_exit_term_map' to '1'.
+
+-------------------------------------------------------------------------------
+                                                        *neomux-misc-scripting*
+Misc / scripting ~
+
+If you want to send keys to a neomux terminal session you can do so via the
+'NeomuxSend(keys)' function.
 
 ===============================================================================
                                                             *neomux-references*
