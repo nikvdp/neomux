@@ -1,12 +1,45 @@
+<!-- blurb
+I spend my days back-and-forthing between files in vim and various terminal windows, and always found neovim's terminal support a bit lacking, so I made a plugin to fix it: [neomux][neomux].
 
+It lets you do lots of cool things with neovim's `:term` emulator:
+
+- Easily jump between neovim windows, even when you have lots of them (no more `<C-w>l<C-w>l<C-w>l` to get to the 3rd window on the right)
+- Pipe commands from the shell into a neovim window (and back to the shell) via stdin/stdout
+- Get and set the contents of vim registers from the command line. 
+
+It's been a definite improvement to my quality of life, sharing it here in the hopes it'll help others too!
+
+[neomux]: https://github.com/nikvdp/neomux
+[neovim-remote]: https://github.com/mhinz/neovim-remote
+
+-->
 # Neomux
 
-Everything awesome about tmux, but in [neovim][neovim]. 
+Ever wished you could yank a line of text from your terminal and paste it into 
+a shell script you're working on? Or that you could pipe the output of a command 
+into a vim window or register?
 
-<!-- START doctoc generated TOC please keep comment here to allow auto update -->
-<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
+With Neomux you can. Neomux is an opinionated (but highly customizable) plugin
+for neovim that integrates your shell and text-editing experience, allowing you
+to control neovim from shells running inside neovim.
 
-<!-- END doctoc generated TOC please keep comment here to allow auto update -->
+In addition to integrating the shell and neovim experience, neomux also
+includes some sugar for dealing with windows: you can swap the locations of
+windows on-screen and jump directly to a window (no more `<C-w>l<C-w>l<C-w>l`
+to move over 3 windows) with a single key-mapping.
+
+<p align="center">
+  <img width="75%" src="https://nikvdp.com/images/neomux-2-window-numbers.gif">
+</p>
+
+
+# Quickstart
+
+Install neomux, start a shell with `:NeomuxTerm` (mapped to `<Leader>sh` by
+default), and use `vw <win_num> <file>` and friends to open files in vim
+windows from the shell.
+
+For more info see the [tutorial](#tutorial).
 
 # Installation
 
@@ -15,13 +48,6 @@ Everything awesome about tmux, but in [neovim][neovim].
    ([vim-plug][vim-plug] is a good place to start)
 3. (Optional, for speed) install [neovim-remote][neovim-remote].
 
-
-# Quickstart
-
-Install neomux, start a shell with `:NeomuxTerm` , and use `vw <win_num>
-<file>` and friends to open files in vim windows from the shell.
-
-For more info see the [tutorial](#tutorial).
 
 # Usage
 
@@ -75,14 +101,14 @@ on a vanilla neovim install):
 
 - `<Leader>sh` - Start a new neomux term in the current window.
 - `<C-w>[1-9]` - move the cursor directly to the window specified (e.g.
-  `<C-w>w3` wouldmove the cursor to window 3)
+  `<C-w>w3` would move the cursor to window 3)
 - `<Leader>s[1-9]` - swap the current window with another window. (e.g.
   `<Leader>s3` would make your current window switch places with window #3)
 - `<C-s>` - Exit insert mode while in a neomux shell. This is just an alias for
-  `<C-\><C-n>` which is the default keymap to end insert mode.
+  `<C-\><C-n>` which is the default keymap to end terminal insert mode.
 - `<Leader>sf` - size-fix. If you re-arrange windows neovim's terminal
   sometimes doesn't automatically resize the terminal to match the new window's
-  size. This keymapping should refresh.
+  size. This keymapping will cause the window to refresh and resize.
 - `<Leader>by` - yank buffer. Sometimes it's handy to be able to yank a buffer
   and paste it into a new window (I often use this if I want to move a window
   to a new tab). Yanked buffers can be pasted with `<Leader>bp`.
@@ -98,7 +124,7 @@ some handy new shell commands.
 
 
 <p align="center">
-  <img width="75%" src="https://srv.nikvdp.com/neomux/1.gif">
+  <img width="75%" src="https://nikvdp.com/images/neomux-1-new-windows.gif">
 </p>
 
 The simplest of the new neomux shell commands are `s`, `vs` and `t`. These
@@ -118,7 +144,7 @@ a vertical split, or a new tab, respectively.
 ### Working with windows by window-number: `vw` and `vwp`
 
 <p align="center">
-  <img width="75%" src="https://srv.nikvdp.com/neomux/2.gif">
+  <img width="75%" src="https://nikvdp.com/images/neomux-2-window-numbers.gif">
 </p>
 
 <!--
@@ -149,7 +175,7 @@ for more details
 
 ### Copying/yanking and pasting text to and from neomux
 <p align="center">
-  <img width="75%" src="https://srv.nikvdp.com/neomux/3.gif">
+  <img width="75%" src="https://nikvdp.com/images/neomux-3-registers.gif">
 </p>
 
 
@@ -189,8 +215,9 @@ This is what's in register a. Appended to register a.
 ```
 
 Special registers such as `/` and `+` work just like any other register, so
-you could even use these as a replacement for `pbpaste` / `xsel` by using `vp
-+`. 
+you could even use these as a roundabout way to replace `pbpaste` / `xsel` by
+using `vp +` (although this is silly since at the end of the day neovim will
+probably call those same tools to retrieve the clipboard). 
 
 # CLI helper reference
 
@@ -200,7 +227,8 @@ to streamline working with neovim.
 
 - ### `vw <win_num> <file>` 
 
-  Open `<file>` in a vim window. For example:
+  Open `<file>` in vim window number `<win_num>`, where `<win_num>` is a number
+  between 1 and 9. For example:
 
   ``` bash
   vw 2 ~/.config/nvim/init.vim 
@@ -240,6 +268,7 @@ to streamline working with neovim.
   neovim's current working dir.
 
 
+<!--
 # Cookbook
 
 - A useful pattern is to combine `vw`, `vp`, and `xargs` to do
@@ -252,14 +281,15 @@ to streamline working with neovim.
   ...select all files and yank to the `@"` register with `ggVGy`...
   vp | xargs rm  # 
   ```
+-->
 
 
 # Customization
 
-Neomux comes with a sane (to me) set of defaults, but it's meant to get out of your way, 
-so much of it's behavior is configurable. 
+Neomux comes with a sane set of defaults, but it's meant to get out of your
+way, so much of it's behavior is configurable. 
 
-Configure neomux by setting any of these variables in your `vimrc` / `init.vim`:
+Configure neomux by setting any of these variables in your `.vimrc` / `init.vim`:
 
 
 ### Key bindings: 
@@ -269,17 +299,19 @@ Configure neomux by setting any of these variables in your `vimrc` / `init.vim`:
 - `g:neomux_winjump_map_prefix` - Default: `<C-w><win_num>`. In Neomux you
   can jump to any open window by hitting `<C-w><win_num>` (e.g. `<C-w>2` jumps to
   window 2. Change this if you want to jump to a different window with a
-  different mapping. NOTE: this is a prefix map, so whatever key you specify will
+  different mapping. 
+  
+  **NOTE:** this is a prefix map, so whatever key you specify will
   have 9 new mappings generated, one for each window. E.g. if you change this to
   `<C-b>`, you would hit `<C-b>2` to move to window 2.
 - `g:neomux_winswap_map_prefix` -  Default: `<Leader>s<win_num>`. You can swap
   the current window with any other window by hitting `<Leader>s<win_num>`.
   Change this if you don't want to use `<Leader>s` for this map. Like
   `g:neomux_winjump_map_prefix`, this is a prefix map, so if you change it to
-  `<Leader>b` it would create 9 new mappings, and you'd swap current window
-  with what's in window #2 with `<C-b>2`.
+  `<Leader>b` it would create 9 new mappings, and you'd swap the current window
+  with window #2 with `<C-b>2`.
 - `g:neomux_yank_buffer_map` - Default: `<Leader>by`. Yank a buffer to be pasted later.
-- `g:neomux_paste_buffer_map` - Default: `<Leader>bp`. Paste a previously yanked buffer.
+- `g:neomux_paste_buffer_map` - Default: `<Leader>bp`. Paste a previously yanked buffer into the current window.
 - `g:neomux_term_sizefix_map` - Default: `<Leader>sf`. Fix a neomux term window that is the wrong size
 - `g:neomux_exit_term_mode_map` - Default: `<C-s>`. Get out of insert mode when inside a neomux terminal window.
 
@@ -290,6 +322,10 @@ Configure neomux by setting any of these variables in your `vimrc` / `init.vim`:
   to customize this, set this variable to a different value. `%{WindowNumber()}`
   will be replaced by the window number itself. 
 
+  If you have [airline](https://github.com/vim-airline/vim-airline) installed
+  neomux will attempt to add it to your airline. If this doesn't work for you please
+  leave an issue!
+
 - `g:neomux_dont_fix_term_ctrlw_map` - By default you can't get out of a neovim
   terminal window with `<C-w>` the way you can from a normal vim window. Neomux
   modifies the default mappings so that `<C-w>` works the same way in a terminal
@@ -299,15 +335,23 @@ Configure neomux by setting any of these variables in your `vimrc` / `init.vim`:
   you can restore neovim's default settings by setting
   `g:neomux_dont_fix_term_ctrlw_map` to `1`.
 
-- `g:neomux_no_exit_term_map` - By default neomux adds a new mapping (configured via 
-  `g:neomux_exit_term_mode_map`) to easily get out of a neovim/neomux terminal
-  window. If you don't want this mapping to be set at all, you can disable it
-  by setting `g:neomux_no_exit_term_map`  to `1`.
+- `g:neomux_no_exit_term_map` - By default neomux adds a new mapping
+  (`g:neomux_exit_term_mode_map`) to easily exit insert mode in a terminal
+  window. If you don't want this mapping to be set at all and would like to use
+  neovim's default `<C-\><C-n>`, you can disable it by setting
+  `g:neomux_no_exit_term_map` to `1`.
 
-### Misc / scripting
+### Miscellanea / troubleshooting
 
-If you want to send keys to a neomux terminal session you can do so via the
-`NeomuxSend(keys)` function. 
+- If you want a simple way to send keys to a neomux terminal session you can do
+  so via the `NeomuxSend(keys)` function. 
+
+- Neomux relies heavily on the excellent [neovim-remote][neovim-remote], and
+  includes amd64 binaries for neovim-remote for MacOS and Linux as they are the
+  most popular platforms. If you're on Windows or using another chipset (e.g.
+  Raspberry pi/ARM) you will need to install python and `pip` manually, and
+  then install neovim-remote via `pip install neovim-remote` before neomux will
+  work.
 
 
 [vim-plug]: https://github.com/junegunn/vim-plug 
