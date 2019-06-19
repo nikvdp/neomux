@@ -49,6 +49,10 @@ function! s:NeomuxMain()
         autocmd TermOpen term://* startinsert
     endif
 
+    " leave term buffer around after process ends, from:
+    " https://vi.stackexchange.com/questions/17816/solved-ish-neovim-dont-close-terminal-buffer-after-process-exit
+    autocmd TermClose *  call feedkeys("\<C-\>\<C-n>")
+
     " exit term mode with g:neomux_exit_term_mode_map (<C-s> by default)
     if !exists('g:neomux_no_exit_term_map')
         execute printf('tnoremap %s <C-\><C-n>', g:neomux_exit_term_mode_map)
