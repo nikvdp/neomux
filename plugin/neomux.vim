@@ -149,6 +149,11 @@ endfunction
 
 
 function! WinSwap(tgt)
+    " hidden needs to be on to prevent buffers from geting deleted while it's
+    " temporarily offscreen
+    let l:orig_hidden = &hidden
+    set hidden
+
     let l:dst_win=a:tgt
     let l:src_win=winnr()
 
@@ -164,16 +169,7 @@ function! WinSwap(tgt)
     noautocmd execute l:dst_win . "wincmd w"
     noautocmd call NeomuxResizeWindow()
 
-    " let l:dst_win=a:tgt
-    " execute l:dst_win . "wincmd w"
-    " let l:dst_buf=bufnr("%")
-
-    " execute "b!" . l:src_winbuf
-    " execute l:src_win . "wincmd w"
-    " execute "b!" . l:dst_buf
-    " execute l:dst_win . "wincmd w"
-
-    " call NeomuxResizeWindow()
+    let &hidden = l:orig_hidden
 endfunction
 
 function! NeomuxSendCtrlW()
