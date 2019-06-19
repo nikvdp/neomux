@@ -1,4 +1,4 @@
-<!-- blurb
+<!-- blurb1
 I spend my days back-and-forthing between files in vim and various terminal windows, and always found neovim's terminal support a bit lacking, so I made a plugin to fix it: [neomux][neomux].
 
 It lets you do lots of cool things with neovim's `:term` emulator:
@@ -13,6 +13,27 @@ It's been a definite improvement to my quality of life, sharing it here in the h
 [neovim-remote]: https://github.com/mhinz/neovim-remote
 
 -->
+
+<!-- blurb2
+Neomux, a neovim <> terminal integration plugin
+
+Neomux packages and wraps [neovim-remote][neovim-remote] goodness into your
+neovim terminals so you can work with neovim's `:term` emulator in some
+interesting new ways. Here's some of the things it lets you do:
+
+- Pipe commands from the shell into a neovim window (and back to the shell) via stdin/stdout
+- Easily jump to any neovim windows with 3 keystrokes, even when you have lots of
+  splits and windows in-between (no more <C-w>l<C-w>l<C-w>l to get to the 3rd
+  window on the right)
+- Get and set the contents of vim registers from the command line via stdin/stdout.
+
+
+It's definitely been a big quality of life improvement for me, maybe it will be
+useful for others too!
+-->
+
+
+
 # Neomux
 
 Ever wished you could yank a line of text from your terminal and paste it into 
@@ -92,14 +113,16 @@ individual windows in neomux.
 
 ## Key bindings
 
-Neomux adds some new key mappings to make working with windows easier.
-Keybindings can be modified from your `vimrc` / `init.vim`, see
+Neomux adds some new key mappings to make working with windows easier.  The
+default keybindings can be customized from your `vimrc` / `init.vim`, see
 [customization](#customization) for more info. 
 
 In the default settings some commands are accessed via the `<Leader>` key (`\`
 on a vanilla neovim install):
 
 - `<Leader>sh` - Start a new neomux term in the current window.
+- `<C-w>t` - Start a new neomux term above the current window (`:split`)
+- `<C-w>T` - Start a new neomux term to the left of the current window (`:vsplit`)
 - `<C-w>[1-9]` - move the cursor directly to the window specified (e.g.
   `<C-w>w3` would move the cursor to window 3)
 - `<Leader>s[1-9]` - swap the current window with another window. (e.g.
@@ -296,13 +319,17 @@ Configure neomux by setting any of these variables in your `.vimrc` / `init.vim`
 
 - `g:neomux_start_term_map` - Default: `<Leader>sh`. This map controls what
   keys start a new Neomux term in the current window.
+- `g:neomux_start_term_split_map` - Default: `<C-w>t`. This map controls what
+  keys start a Neomux term in a `:split` window.
+- `g:neomux_start_term_vsplit_map` - Default: `<C-w>t`. This map controls what keys
+  start a Neomux term in a `:vsplit` window.
 - `g:neomux_winjump_map_prefix` - Default: `<C-w><win_num>`. In Neomux you
   can jump to any open window by hitting `<C-w><win_num>` (e.g. `<C-w>2` jumps to
   window 2. Change this if you want to jump to a different window with a
   different mapping. 
   
-  **NOTE:** this is a prefix map, so whatever key you specify will
-  have 9 new mappings generated, one for each window. E.g. if you change this to
+  > **NOTE:** this is a prefix map, so whatever key you specify will
+  > have 9 new mappings generated, one for each window. E.g. if you change this to
   `<C-b>`, you would hit `<C-b>2` to move to window 2.
 - `g:neomux_winswap_map_prefix` -  Default: `<Leader>s<win_num>`. You can swap
   the current window with any other window by hitting `<Leader>s<win_num>`.

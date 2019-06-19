@@ -115,14 +115,19 @@ individual windows in neomux.
                                                           *neomux-key-bindings*
 Key bindings ~
 
-Neomux adds some new key mappings to make working with windows easier.
-Keybindings can be modified from your 'vimrc' / 'init.vim', see customization
-for more info.
+Neomux adds some new key mappings to make working with windows easier. The
+default keybindings can be customized from your 'vimrc' / 'init.vim', see
+customization for more info.
 
 In the default settings some commands are accessed via the '<Leader>' key ('\'
 on a vanilla neovim install):
 
 - '<Leader>sh' - Start a new neomux term in the current window.
+
+- '<C-w>t' - Start a new neomux term above the current window (':split')
+
+- '<C-w>T' - Start a new neomux term to the left of the current window
+  (':vsplit')
 
 - '<C-w>[1-9]' - move the cursor directly to the window specified (e.g.
   '<C-w>w3' would move the cursor to window 3)
@@ -312,6 +317,12 @@ Key bindings: ~
 
 - 'g:neomux_start_term_map' - Default: '<Leader>sh'. This map controls what
   keys start a new Neomux term in the current window.
+
+- 'g:neomux_start_term_split_map' - Default: '<C-w>t'. This map controls what
+  keys start a Neomux term in a ':split' window.
+
+- 'g:neomux_start_term_vsplit_map' - Default: '<C-w>t'. This map controls
+  what keys start a Neomux term in a ':vsplit' window.
 
 - 'g:neomux_winjump_map_prefix' - Default: '<C-w><win_num>'. In Neomux you
   can jump to any open window by hitting '<C-w><win_num>' (e.g. '<C-w>2'
