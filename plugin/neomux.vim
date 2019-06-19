@@ -12,7 +12,7 @@ function! s:NeomuxMain()
     " Set default key bindings if no user defined maps present
     if !exists('g:neomux_start_term_map') | let g:neomux_start_term_map = '<Leader>sh' | endif
     if !exists('g:neomux_start_term_split_map') | let g:neomux_start_term_split_map = '<C-w>t' | endif
-    if !exists('g:start_term_vsplit_map') | let g:start_term_vsplit_map = '<C-w>T' | endif
+    if !exists('g:neomux_start_term_vsplit_map') | let g:neomux_start_term_vsplit_map = '<C-w>T' | endif
     if !exists('g:neomux_winjump_map_prefix') | let g:neomux_winjump_map_prefix = "<C-w>" | endif
     if !exists('g:neomux_winswap_map_prefix') | let g:neomux_winswap_map_prefix =  "<Leader>s" | endif
     if !exists('g:neomux_yank_buffer_map') | let g:neomux_yank_buffer_map = "<Leader>by" | endif
@@ -70,9 +70,9 @@ function! s:NeomuxMain()
     call EnableWinJump()
 
     execute printf('noremap %s :split<CR>:call NeomuxTerm()<CR>', g:neomux_start_term_split_map)
-    execute printf('noremap %s :vsplit<CR>:call NeomuxTerm()<CR>', g:start_term_vsplit_map)
+    execute printf('noremap %s :vsplit<CR>:call NeomuxTerm()<CR>', g:neomux_start_term_vsplit_map)
     execute printf('tnoremap %s <C-\><C-n>:split<CR>:call NeomuxTerm()<CR>', g:neomux_start_term_split_map)
-    execute printf('tnoremap %s <C-\><C-n>:vsplit<CR>:call NeomuxTerm()<CR>', g:start_term_vsplit_map)
+    execute printf('tnoremap %s <C-\><C-n>:vsplit<CR>:call NeomuxTerm()<CR>', g:neomux_start_term_vsplit_map)
 
     " Yank current buffer
     execute printf('map %s :call NeomuxYankBuffer()<CR>', g:neomux_yank_buffer_map)
