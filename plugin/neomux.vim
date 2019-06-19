@@ -1,5 +1,5 @@
 if exists('g:neomux_loaded') && g:neomux_loaded
-	finish
+    finish
 endif
 let g:neomux_loaded = 1
 
@@ -46,10 +46,11 @@ function! s:NeomuxMain()
     " from: https://github.com/neovim/neovim/issues/8816#issuecomment-410502364
     if g:neomux_no_term_autoinsert == 0
         au BufEnter * if &buftype == 'terminal' | :startinsert | endif
+        autocmd TermOpen term://* startinsert
     endif
 
+    " exit term mode with g:neomux_exit_term_mode_map (<C-s> by default)
     if !exists('g:neomux_no_exit_term_map')
-        " exit term mode with g:neomux_exit_term_mode_map (<C-s> by default)
         execute printf('tnoremap %s <C-\><C-n>', g:neomux_exit_term_mode_map)
         execute printf('inoremap %s <Esc>', g:neomux_exit_term_mode_map)
     endif
@@ -70,12 +71,38 @@ function! s:NeomuxMain()
     execute printf('tnoremap %s <C-\><C-n>:vsplit<CR>:call NeomuxTerm()<CR>', g:start_term_vsplit_map)
 
     " Yank current buffer
-    execute printf('map %s :let t:yanked_buffer=bufnr("%%")<CR>:echo "Yanked buffer " . t:yanked_buffer<CR>', g:neomux_yank_buffer_map)
+    execute printf('map %s :call NeomuxYankBuffer()<CR>', g:neomux_yank_buffer_map)
     " Paste current buffer
-    execute printf('map %s :execute ":b" . t:yanked_buffer<CR>:echo "Pasted buffer " . t:yanked_buffer<CR>', g:neomux_paste_buffer_map)
+    execute printf('map %s :call NeomuxPasteBuffer()<CR>', g:neomux_paste_buffer_map)
 
     " term size-fix map
-    execute printf('noremap %s <C-\><C-n><Esc>:10 wincmd <<CR>:10 wincmd -<CR>:10 wincmd +<CR>:10 wincmd ><CR>', g:neomux_term_sizefix_map)
+    execute printf('noremap %s <C-\><C-n><Esc>:call NeomuxResizeWindow()<CR>', g:neomux_term_sizefix_map)
+endfunction
+
+function! NeomuxYankBuffer(...)
+    let l:register = a:0 > 0 ? a:1 : "default"
+
+    if ! exists('s:yanked_buffers')
+        let s:yanked_buffers = {}
+    endif
+
+    stopinsert
+    let s:yanked_buffers[l:register] = bufnr("%")
+    echo printf("Yanked buffer #%s to register '%s'.", s:yanked_buffers[l:register], l:register)
+endfunction
+
+function! NeomuxPasteBuffer(...)
+    let l:register = a:0 > 0 ? a:1 : "default"
+    stopinsert
+    execute printf(":b!%s", s:yanked_buffers[l:register])
+    echo printf("Pasted buffer #%s from register '%s'", s:yanked_buffers[l:register], l:register)
+endfunction
+
+function! NeomuxResizeWindow()
+    10 wincmd <
+    10 wincmd -
+    10 wincmd +
+    10 wincmd >
 endfunction
 
 function! NeomuxTerm(...)
@@ -92,11 +119,11 @@ function! NeomuxTerm(...)
     let $EDITOR=printf("%s/nmux", l:bin_folder)
 
     if exists("l:term_cmd")
-        execute printf("term! %s", l:term_cmd) 
+        execute printf("term! %s", l:term_cmd)
     else
         if len(g:neomux_default_shell) > 0
             execute printf("term! %s", g:neomux_default_shell)
-        else 
+        else
             term!
         endif
     endif
@@ -107,9 +134,9 @@ function! WindowNumber()
 endfunction
 
 function! EnableWinJump(...)
-    let l:key = a:0 > 0 ? a:1 : g:neomux_winjump_map_prefix
-    " Jump directly to different windows
+    " Mappings to jump directly to windows by window number
     " adapted from this SO post: http://stackoverflow.com/questions/6403716/shortcut-for-moving-between-vim-windows
+    let l:key = a:0 > 0 ? a:1 : g:neomux_winjump_map_prefix
     let i = 1
     while i <= 9
         execute printf('nnoremap %s%s :%swincmd w<CR>', l:key, i, i)
@@ -122,17 +149,31 @@ endfunction
 
 
 function! WinSwap(tgt)
-    let l:src_win=winnr()
-    let l:src_winbuf=bufnr("%")
-
     let l:dst_win=a:tgt
-    execute l:dst_win . "wincmd w"
-    let l:dst_buf=bufnr("%")
+    let l:src_win=winnr()
 
-    execute "b!" . l:src_winbuf
-    execute l:src_win . "wincmd w"
-    execute "b!" . l:dst_buf
-    execute l:dst_win . "wincmd w"
+    noautocmd silent! call NeomuxYankBuffer("swap_src")
+
+    noautocmd execute l:dst_win . "wincmd w"
+    noautocmd silent! call NeomuxYankBuffer("swap_dst")
+    noautocmd silent! call NeomuxPasteBuffer("swap_src")
+    noautocmd call NeomuxResizeWindow()
+
+    noautocmd execute l:src_win . "wincmd w"
+    noautocmd silent! call NeomuxPasteBuffer("swap_dst")
+    noautocmd execute l:dst_win . "wincmd w"
+    noautocmd call NeomuxResizeWindow()
+
+    " let l:dst_win=a:tgt
+    " execute l:dst_win . "wincmd w"
+    " let l:dst_buf=bufnr("%")
+
+    " execute "b!" . l:src_winbuf
+    " execute l:src_win . "wincmd w"
+    " execute "b!" . l:dst_buf
+    " execute l:dst_win . "wincmd w"
+
+    " call NeomuxResizeWindow()
 endfunction
 
 function! NeomuxSendCtrlW()
