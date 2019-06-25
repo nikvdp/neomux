@@ -127,7 +127,9 @@ function! NeomuxTerm(...)
     else
         if len(g:neomux_default_shell) > 0
             execute printf("term! %s", g:neomux_default_shell)
-        else
+		elseif len($SHELL) > 0
+            term! $SHELL
+		else
             term!
         endif
     endif
