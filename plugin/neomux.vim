@@ -29,10 +29,12 @@ function! s:NeomuxMain()
 
     " Put window number labels in statusline
     " TODO: test airline works as expected
-    if exists("g:airline_theme")
-        let g:airline_section_z = g:neomux_win_num_status . g:airline_section_z
+    if exists("g:airline_theme") && ! exists('g:airline_section_z')
+		let g:airline_section_z = g:neomux_win_num_status
     else
-        let &statusline = &statusline . g:neomux_win_num_status
+		if &statusline !~ g:neomux_win_num_status
+			let &statusline = &statusline . g:neomux_win_num_status
+		endif
     endif
 
     " Make getting out of terminal windows work the same way it does for every
