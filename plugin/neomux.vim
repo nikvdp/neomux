@@ -29,8 +29,12 @@ function! s:NeomuxMain()
 
     " Put window number labels in statusline
     " TODO: test airline works as expected
-    if exists("g:airline_theme") && ! exists('g:airline_section_z')
-		let g:airline_section_z = g:neomux_win_num_status
+    if exists("g:airline_theme") 
+        if ! exists('g:airline_section_z')
+            let g:airline_section_z = g:neomux_win_num_status
+        else
+            let g:airline_section_z = g:airline_section_z . g:neomux_win_num_status
+        endif
     else
 		if &statusline !~ g:neomux_win_num_status
 			let &statusline = &statusline . g:neomux_win_num_status
