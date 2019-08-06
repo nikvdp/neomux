@@ -27,19 +27,7 @@ function! s:NeomuxMain()
 
     command! Neomux call NeomuxTerm()
 
-    " Put window number labels in statusline
-    " TODO: test airline works as expected
-    if exists("g:airline_theme") 
-        if ! exists('g:airline_section_z')
-            let g:airline_section_z = g:neomux_win_num_status
-        else
-            let g:airline_section_z = g:airline_section_z . g:neomux_win_num_status
-        endif
-    else
-		if &statusline !~ g:neomux_win_num_status
-			let &statusline = &statusline . g:neomux_win_num_status
-		endif
-    endif
+    call NeomuxAddWinNumLabels()
 
     " Make getting out of terminal windows work the same way it does for every
     " other window. If you need to send a <C-w> keystroke to the term window,
@@ -192,6 +180,21 @@ function! NeomuxSend(keys)
     call chansend(b:terminal_job_id, a:keys)
 endfunction
 
+function! NeomuxAddWinNumLabels()
+    " Put window number labels in statusline
+    " TODO: test airline works as expected
+    if exists("g:airline_theme") 
+        if ! exists('g:airline_section_z')
+            let g:airline_section_z = g:neomux_win_num_status
+        else
+            let g:airline_section_z = g:airline_section_z . g:neomux_win_num_status
+        endif
+    else
+		if &statusline !~ g:neomux_win_num_status
+			let &statusline = &statusline . g:neomux_win_num_status
+		endif
+    endif
+endfunction
 
 call s:NeomuxMain()
 
