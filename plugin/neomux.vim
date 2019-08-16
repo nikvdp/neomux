@@ -1,3 +1,6 @@
+if ! has("nvim")
+    finish
+endif
 if exists('g:neomux_loaded') && g:neomux_loaded
     finish
 endif
