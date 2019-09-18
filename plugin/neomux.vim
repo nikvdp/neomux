@@ -124,9 +124,9 @@ function! NeomuxTerm(...)
     else
         if len(g:neomux_default_shell) > 0
             execute printf("term! %s", g:neomux_default_shell)
-		elseif len($SHELL) > 0
+        elseif len($SHELL) > 0
             term! $SHELL
-		else
+        else
             term!
         endif
     endif
@@ -186,16 +186,13 @@ endfunction
 function! NeomuxAddWinNumLabels()
     " Put window number labels in statusline
     " TODO: test airline works as expected
-    if exists("g:airline_theme") 
-        if ! exists('g:airline_section_z')
-            let g:airline_section_z = g:neomux_win_num_status
-        else
-            let g:airline_section_z = g:airline_section_z . g:neomux_win_num_status
-        endif
+    if ! exists('g:airline_section_z')
+        let g:airline_section_z = g:neomux_win_num_status
     else
-		if &statusline !~ g:neomux_win_num_status
-			let &statusline = &statusline . g:neomux_win_num_status
-		endif
+        let g:airline_section_z = g:airline_section_z . g:neomux_win_num_status
+    endif
+    if &statusline !~ g:neomux_win_num_status
+        let &statusline = &statusline . g:neomux_win_num_status
     endif
 endfunction
 
