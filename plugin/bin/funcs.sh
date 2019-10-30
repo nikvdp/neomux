@@ -42,7 +42,7 @@ vim-window-print() {
     local win="$1"
     local oldwin="$(nvr --remote-expr 'tabpagewinnr(tabpagenr())')"
     nvr -cc "${win}wincmd w" --remote-expr 'join(getline(1,"$"), "\n")' -c "${oldwin}wincmd w"
-    nvr --remote-send a
+    # nvr --remote-send a
 }
 
 vimwindow() {
