@@ -12,22 +12,6 @@ let s:os = systemlist("uname -s")[0]
 let s:arch = systemlist("uname -m")[0]
 
 function! s:NeomuxMain()
-    " Set default key bindings if no user defined maps present
-    if !exists('g:neomux_start_term_map') | let g:neomux_start_term_map = '<Leader>sh' | endif
-    if !exists('g:neomux_start_term_split_map') | let g:neomux_start_term_split_map = '<C-w>t' | endif
-    if !exists('g:neomux_start_term_vsplit_map') | let g:neomux_start_term_vsplit_map = '<C-w>T' | endif
-    if !exists('g:neomux_winjump_map_prefix') | let g:neomux_winjump_map_prefix = "<C-w>" | endif
-    if !exists('g:neomux_winswap_map_prefix') | let g:neomux_winswap_map_prefix =  "<Leader>s" | endif
-    if !exists('g:neomux_yank_buffer_map') | let g:neomux_yank_buffer_map = "<Leader>by" | endif
-    if !exists('g:neomux_paste_buffer_map') | let g:neomux_paste_buffer_map = '<Leader>bp' | endif
-    " Pnemonic: size-fix. Resize terminal window back to proper size
-    if !exists('g:neomux_term_sizefix_map') | let g:neomux_term_sizefix_map = '<Leader>sf'  | endif
-    if !exists('g:neomux_win_num_status') | let g:neomux_win_num_status = '∥ W:[%{WindowNumber()}] ∥' | endif
-    if !exists('g:neomux_exit_term_mode_map') | let g:neomux_exit_term_mode_map = '<C-s>' | endif
-    if !exists('g:neomux_default_shell') | let g:neomux_default_shell = "" | endif
-    if !exists('g:neomux_dont_fix_term_ctrlw_map') | let g:neomux_dont_fix_term_ctrlw_map = 0 | endif
-    if !exists('g:neomux_no_term_autoinsert') | let g:neomux_no_term_autoinsert = 0 | endif
-
     command! Neomux call NeomuxTerm()
 
     call NeomuxAddWinNumLabels()
@@ -35,49 +19,82 @@ function! s:NeomuxMain()
     " Make getting out of terminal windows work the same way it does for every
     " other window. If you need to send a <C-w> keystroke to the term window,
     " use `:call NeomuxSendCtrlW()`
-    if g:neomux_dont_fix_term_ctrlw_map == 0
+    if !get(g:, 'neomux_dont_fix_term_ctrlw_map', 0)
         tnoremap <C-w> <C-\><C-n><C-w>
     endif
 
     " Automatically start insert mode when entering a terminal buffer
     " from: https://github.com/neovim/neovim/issues/8816#issuecomment-410502364
-    if g:neomux_no_term_autoinsert == 0
+    " TODO: document
+    if !get(g:, 'neomux_no_term_autoinsert', 0)
         au BufEnter * if &buftype == 'terminal' | :startinsert | endif
         autocmd TermOpen term://* startinsert
     endif
 
     " leave term buffer around after process ends, from:
     " https://vi.stackexchange.com/questions/17816/solved-ish-neovim-dont-close-terminal-buffer-after-process-exit
-    autocmd TermClose *  call feedkeys("\<C-\>\<C-n>")
+    " TODO: document
+    if !get(g:, 'neomux_no_term_leave_after_exit', 0)
+        autocmd TermClose *  call feedkeys("\<C-\>\<C-n>")
+    endif
 
     " exit term mode with g:neomux_exit_term_mode_map (<C-s> by default)
-    if !exists('g:neomux_no_exit_term_map')
-        execute printf('tnoremap %s <C-\><C-n>', g:neomux_exit_term_mode_map)
-        execute printf('inoremap %s <Esc>', g:neomux_exit_term_mode_map)
+    let s:neomux_exit_term_map = get(g:, 'neomux_exit_term_map', '<C-s>')
+    if !empty(s:neomux_exit_term_map)
+        execute printf('tnoremap %s <C-\><C-n>', s:neomux_exit_term_map)
+        execute printf('inoremap %s <Esc>', s:neomux_exit_term_map)
     endif
 
     " set neomux start term map
-    execute printf("noremap %s :Neomux<CR>", g:neomux_start_term_map)
+    let s:neomux_start_term_map = get(g:, 'neomux_start_term_map', '<Leader>sh')
+    if !empty(s:neomux_start_term_map)
+        execute printf("noremap %s :Neomux<CR>", s:neomux_start_term_map)
+    endif
 
     " set winswap mappings
-    for i in [1,2,3,4,5,6,7,8,9]
-        execute printf('map %s%s :call WinSwap("%s")<CR>', g:neomux_winswap_map_prefix, i, i)
-    endfor
+    let s:neomux_winswap_map_prefix = get(g:, 'neomux_winswap_map_prefix', '<C-w>')
+    if !empty(s:neomux_winswap_map_prefix)
+        for i in [1,2,3,4,5,6,7,8,9]
+            execute printf('map %s%s :call WinSwap("%s")<CR>', s:neomux_winswap_map_prefix, i, i)
+        endfor
+    endif
 
     call EnableWinJump()
 
-    execute printf('noremap %s :split<CR>:call NeomuxTerm()<CR>', g:neomux_start_term_split_map)
-    execute printf('noremap %s :vsplit<CR>:call NeomuxTerm()<CR>', g:neomux_start_term_vsplit_map)
-    execute printf('tnoremap %s <C-\><C-n>:split<CR>:call NeomuxTerm()<CR>', g:neomux_start_term_split_map)
-    execute printf('tnoremap %s <C-\><C-n>:vsplit<CR>:call NeomuxTerm()<CR>', g:neomux_start_term_vsplit_map)
+    let s:neomux_start_term_split_map = get(g:, 'neomux_start_term_split_map', '<C-w>t')
+    if !empty(s:neomux_start_term_split_map)
+        execute printf('noremap %s :split<CR>:call NeomuxTerm()<CR>', s:neomux_start_term_split_map)
+    endif
+    let s:neomux_start_term_vsplit_map = get(g:, 'neomux_start_term_vsplit_map', '<C-w>T')
+    if !empty(s:neomux_start_term_vsplit_map)
+        execute printf('noremap %s :vsplit<CR>:call NeomuxTerm()<CR>', s:neomux_start_term_vsplit_map)
+    endif
+    let s:neomux_start_term_split_map = get(g:, 'neomux_start_term_split_map', '<C-w>t')
+    if !empty(s:neomux_start_term_split_map)
+        execute printf('tnoremap %s <C-\><C-n>:split<CR>:call NeomuxTerm()<CR>', s:neomux_start_term_split_map)
+    endif
+    let s:neomux_start_term_vsplit_map = get(g:, 'neomux_start_term_vsplit_map', '<C-w>T')
+    if !empty(s:neomux_start_term_vsplit_map)
+        execute printf('tnoremap %s <C-\><C-n>:vsplit<CR>:call NeomuxTerm()<CR>', s:neomux_start_term_vsplit_map)
+    endif
 
     " Yank current buffer
-    execute printf('map %s :call NeomuxYankBuffer()<CR>', g:neomux_yank_buffer_map)
+    let s:neomux_yank_buffer_map = get(g:, 'neomux_yank_buffer_map', '<Leader>by')
+    if !empty(s:neomux_yank_buffer_map)
+        execute printf('map %s :call NeomuxYankBuffer()<CR>', s:neomux_yank_buffer_map)
+    endif
     " Paste current buffer
-    execute printf('map %s :call NeomuxPasteBuffer()<CR>', g:neomux_paste_buffer_map)
+    let s:neomux_paste_buffer_map = get(g:, 'neomux_paste_buffer_map', '<Leader>bp')
+    if !empty(s:neomux_paste_buffer_map)
+        execute printf('map %s :call NeomuxPasteBuffer()<CR>', s:neomux_paste_buffer_map)
+    endif
 
     " term size-fix map
-    execute printf('noremap %s <C-\><C-n><Esc>:call NeomuxResizeWindow()<CR>', g:neomux_term_sizefix_map)
+    " Pnemonic: size-fix. Resize terminal window back to proper size
+    let s:neomux_term_sizefix_map = get(g:, 'neomux_term_sizefix_map', '<Leader>sf')
+    if !empty(s:neomux_term_sizefix_map)
+        execute printf('noremap %s <C-\><C-n><Esc>:call NeomuxResizeWindow()<CR>', s:neomux_term_sizefix_map)
+    endif
 endfunction
 
 function! NeomuxYankBuffer(...)
@@ -122,8 +139,9 @@ function! NeomuxTerm(...)
     if exists("l:term_cmd")
         execute printf("term! %s", l:term_cmd)
     else
-        if len(g:neomux_default_shell) > 0
-            execute printf("term! %s", g:neomux_default_shell)
+        let s:neomux_default_shell = get(g:, 'neomux_default_shell', '')
+        if !empty(s:neomux_default_shell)
+            execute printf("term! %s", s:neomux_default_shell)
         elseif len($SHELL) > 0
             term! $SHELL
         else
@@ -139,7 +157,8 @@ endfunction
 function! EnableWinJump(...)
     " Mappings to jump directly to windows by window number
     " adapted from this SO post: http://stackoverflow.com/questions/6403716/shortcut-for-moving-between-vim-windows
-    let l:key = a:0 > 0 ? a:1 : g:neomux_winjump_map_prefix
+    let s:neomux_winjump_map_prefix = get(g:, 'neomux_winjump_map_prefix', '<C-w>')
+    let l:key = a:0 > 0 ? a:1 : s:neomux_winjump_map_prefix
     let i = 1
     while i <= 9
         execute printf('nnoremap %s%s :%swincmd w<CR>', l:key, i, i)
@@ -185,14 +204,14 @@ endfunction
 
 function! NeomuxAddWinNumLabels()
     " Put window number labels in statusline
-    " TODO: test airline works as expected
+    let s:neomux_win_num_status = get(g:, 'neomux_win_num_status', '∥ W:[%{WindowNumber()}] ∥')
     if ! exists('g:airline_section_z')
-        let g:airline_section_z = g:neomux_win_num_status
+        let g:airline_section_z = s:neomux_win_num_status
     else
-        let g:airline_section_z = g:airline_section_z . g:neomux_win_num_status
+        let g:airline_section_z = g:airline_section_z . s:neomux_win_num_status
     endif
-    if &statusline !~ g:neomux_win_num_status
-        let &statusline = &statusline . g:neomux_win_num_status
+    if &statusline !~ s:neomux_win_num_status
+        let &statusline = &statusline . s:neomux_win_num_status
     endif
 endfunction
 
