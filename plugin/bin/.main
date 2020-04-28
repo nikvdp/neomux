@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 s() {
     # split
     nvr --remote -o "$@"
@@ -13,14 +15,16 @@ t() {
     nvr --remote-tab "$@"
 }
 
-vbcopy() {
+# formerly vbcopy
+vc() {
     local register=${1:-@""}
     local inp
     inp="$(</dev/stdin)"
     nvr -c "let @$register=\"$(echo "$inp" | sed -E 's/(["\])/\\\1/g')\""
 }
 
-vbpaste () {
+# formerly vbpaste
+vp () {
     local register="${1:-@\"}"
     nvr --remote-expr "@$register"
 }
@@ -28,7 +32,7 @@ vbpaste () {
 
 vcd () {
     # switch *neovim's* working dir to $1
-    local dir="$(abspath "${1:-$PWD}")"
+    local dir="$(_abspath "${1:-$PWD}")"
     nvr -c "chdir $dir"
 }
 
@@ -37,7 +41,7 @@ vpwd() {
     nvr --remote-expr "getcwd()"
 }
 
-vim-window-print() {
+vwp() {
     # vim-window-print: send contents of a window out to stdout
     local win="$1"
     local oldwin="$(nvr --remote-expr 'tabpagewinnr(tabpagenr())')"
@@ -45,7 +49,8 @@ vim-window-print() {
     # nvr --remote-send a
 }
 
-vimwindow() {
+# formerly vim-window
+vw() {
     # remote nvim open file $2 in window $1
     local win="$1"
     local file="$2"
@@ -53,11 +58,11 @@ vimwindow() {
         # allow piping stdin if '-' passed as filename
         cat | nvr -cc "${win}wincmd w" --remote -
     else
-        nvr -cc "${win}wincmd w" -c "e $(abspath "$file")"
+        nvr -cc "${win}wincmd w" -c "e $(_abspath "$file")"
     fi
 }
 
-abspath() {
+_abspath() {
     local in_path
     if [[ ! "$1" =~ ^/ ]]; then
         in_path="$PWD/$1"
@@ -91,3 +96,13 @@ abspath() {
         echo /"${outp[*]}"
     )
 }
+
+nmux() {
+    nvr -cc vsplit --remote-wait "$@"
+}
+
+if [ -L "$0" ]; then
+    "$(basename $0)" "$@"
+fi
+
+exit 127
