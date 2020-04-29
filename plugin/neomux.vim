@@ -69,12 +69,14 @@ function! s:NeomuxMain()
     if !empty(s:neomux_start_term_vsplit_map)
         execute printf('noremap %s :vsplit<CR>:call NeomuxTerm()<CR>', s:neomux_start_term_vsplit_map)
     endif
-    let s:neomux_start_term_split_map = get(g:, 'neomux_start_term_split_map', '<C-w>t')
-    if !empty(s:neomux_start_term_split_map)
+    " TODO: document the difference between this and the same but with tmap
+    let s:neomux_start_term_split_tmap = get(g:, 'neomux_start_term_split_tmap', '<C-w>t') || s:neomux_start_term_split_map
+    if !empty(s:neomux_start_term_split_tmap)
         execute printf('tnoremap %s <C-\><C-n>:split<CR>:call NeomuxTerm()<CR>', s:neomux_start_term_split_map)
     endif
-    let s:neomux_start_term_vsplit_map = get(g:, 'neomux_start_term_vsplit_map', '<C-w>T')
-    if !empty(s:neomux_start_term_vsplit_map)
+    " TODO: document the difference between this and the same but with tmap
+    let s:neomux_start_term_vsplit_tmap = get(g:, 'neomux_start_term_vsplit_tmap', '<C-w>T') || s:neomux_start_term_vsplit_map
+    if !empty(s:neomux_start_term_vsplit_tmap)
         execute printf('tnoremap %s <C-\><C-n>:vsplit<CR>:call NeomuxTerm()<CR>', s:neomux_start_term_vsplit_map)
     endif
 
