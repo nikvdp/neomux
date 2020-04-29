@@ -160,15 +160,17 @@ function! EnableWinJump(...)
     " Mappings to jump directly to windows by window number
     " adapted from this SO post: http://stackoverflow.com/questions/6403716/shortcut-for-moving-between-vim-windows
     let s:neomux_winjump_map_prefix = get(g:, 'neomux_winjump_map_prefix', '<C-w>')
-    let l:key = a:0 > 0 ? a:1 : s:neomux_winjump_map_prefix
-    let i = 1
-    while i <= 9
-        execute printf('nnoremap %s%s :%swincmd w<CR>', l:key, i, i)
-        if has("nvim")
-            execute printf('tnoremap %s%s <C-\><C-n>:%swincmd w<CR>', l:key, i, i)
-        endif
-        let i = i + 1
-    endwhile
+    if !empty(s:neomux_winjump_map_prefix)
+        let l:key = a:0 > 0 ? a:1 : s:neomux_winjump_map_prefix
+        let i = 1
+        while i <= 9
+            execute printf('nnoremap %s%s :%swincmd w<CR>', l:key, i, i)
+            if has("nvim")
+                execute printf('tnoremap %s%s <C-\><C-n>:%swincmd w<CR>', l:key, i, i)
+            endif
+            let i = i + 1
+        endwhile
+    endif
 endfunction
 
 
