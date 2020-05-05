@@ -71,7 +71,7 @@ _abspath() {
     fi
     echo "$in_path"|(
         IFS=/
-        read -a parr
+        read -r -a parr
         declare -a outp
         for i in "${parr[@]}"; do
             case "$i" in
@@ -101,8 +101,8 @@ nmux() {
     nvr -cc vsplit --remote-wait "$@"
 }
 
-if [ -L "$0" ]; then
-    "$(basename $0)" "$@"
+if [[ -L "$0" ]]; then
+    "$(basename "$0")" "$@"
 fi
 
 exit 127
