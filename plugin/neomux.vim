@@ -185,16 +185,18 @@ endfunction
 
 function! NeomuxAddWinNumLabels()
     " Put window number labels in statusline
-    " TODO: test airline works as expected
-    if ! exists('g:airline_section_z')
-        let g:airline_section_z = g:neomux_win_num_status
+
+    if &runtimepath =~ 'airline' && exists('*airline#parts#define_raw') 
+        call airline#parts#define_raw('neomux_win_num', g:neomux_win_num_status)
+        let g:airline_section_z = airline#section#create_right(['ffenc', 'neomux_win_num'])
     else
-        let g:airline_section_z = g:airline_section_z . g:neomux_win_num_status
+        if &statusline !~ g:neomux_win_num_status
+            let &statusline = &statusline . g:neomux_win_num_status
+        endif
     endif
-    if &statusline !~ g:neomux_win_num_status
-        let &statusline = &statusline . g:neomux_win_num_status
-    endif
+
 endfunction
+
 
 call s:NeomuxMain()
 
