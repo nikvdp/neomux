@@ -321,7 +321,7 @@ Configure neomux by setting any of these variables in your `.vimrc` / `init.vim`
   keys start a new Neomux term in the current window.
 - `g:neomux_start_term_split_map` - Default: `<C-w>t`. This map controls what
   keys start a Neomux term in a `:split` window.
-- `g:neomux_start_term_vsplit_map` - Default: `<C-w>t`. This map controls what keys
+- `g:neomux_start_term_vsplit_map` - Default: `<C-w>T`. This map controls what keys
   start a Neomux term in a `:vsplit` window.
 - `g:neomux_winjump_map_prefix` - Default: `<C-w><win_num>`. In Neomux you
   can jump to any open window by hitting `<C-w><win_num>` (e.g. `<C-w>2` jumps to
