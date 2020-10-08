@@ -186,9 +186,20 @@ endfunction
 function! NeomuxAddWinNumLabels()
     " Put window number labels in statusline
 
-    if &runtimepath =~ 'airline' && exists('*airline#parts#define_raw') 
-        call airline#parts#define_raw('neomux_win_num', g:neomux_win_num_status)
-        let g:airline_section_z = airline#section#create_right(['ffenc', 'neomux_win_num'])
+    if &runtimepath =~ 'airline' && exists('*airline#parts#define') 
+        " There appears to be a bug in airline's terminal extension that causes the
+        " window numbers to disappear from terminal windows when the windows lose
+        " focus. I've opened an issue with airline here:
+        "   https://github.com/vim-airline/vim-airline/issues/2249
+        " In the meantime, workaround by disabling airline's terminal extension 
+        let g:airline#extensions#term#enabled = 0
+
+        function! NeomuxAirlineHelper(...)
+            let w:airline_section_z = g:airline_section_z . " " . g:neomux_win_num_status
+            " let g:airline_variable_referenced_in_statusline = 'foo'
+        endfunction
+        call airline#add_statusline_func('NeomuxAirlineHelper')
+
     else
         if &statusline !~ g:neomux_win_num_status
             let &statusline = &statusline . g:neomux_win_num_status
