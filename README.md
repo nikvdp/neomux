@@ -323,20 +323,21 @@ Configure neomux by setting any of these variables in your `.vimrc` / `init.vim`
   keys start a Neomux term in a `:split` window.
 - `g:neomux_start_term_vsplit_map` - Default: `<C-w>T`. This map controls what keys
   start a Neomux term in a `:vsplit` window.
-- `g:neomux_winjump_map_prefix` - Default: `<C-w><win_num>`. In Neomux you
+- `g:neomux_winjump_map_prefix` - Default: `<C-w>`. In Neomux you
   can jump to any open window by hitting `<C-w><win_num>` (e.g. `<C-w>2` jumps to
   window 2. Change this if you want to jump to a different window with a
   different mapping. 
   
   > **NOTE:** this is a prefix map, so whatever key you specify will
   > have 9 new mappings generated, one for each window. E.g. if you change this to
-  `<C-b>`, you would hit `<C-b>2` to move to window 2.
-- `g:neomux_winswap_map_prefix` -  Default: `<Leader>s<win_num>`. You can swap
+  > `<C-b>`, you would hit `<C-b>2` to move to window 2.
+- `g:neomux_winswap_map_prefix` -  Default: `<Leader>s`. You can swap
   the current window with any other window by hitting `<Leader>s<win_num>`.
-  Change this if you don't want to use `<Leader>s` for this map. Like
-  `g:neomux_winjump_map_prefix`, this is a prefix map, so if you change it to
-  `<Leader>b` it would create 9 new mappings, and you'd swap the current window
-  with window #2 with `<C-b>2`.
+  Change this if you don't want to use `<Leader>s` for this map.
+
+  > **NOTE:** like `g:neomux_winjump_map_prefix`, this is a prefix map, so if you change it to
+  > `<Leader>b` it would create 9 new mappings, and you'd swap the current window
+  > with window #2 with `<Leader>b2`.
 - `g:neomux_yank_buffer_map` - Default: `<Leader>by`. Yank a buffer to be pasted later.
 - `g:neomux_paste_buffer_map` - Default: `<Leader>bp`. Paste a previously yanked buffer into the current window.
 - `g:neomux_term_sizefix_map` - Default: `<Leader>sf`. Fix a neomux term window that is the wrong size
