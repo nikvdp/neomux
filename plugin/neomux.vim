@@ -4,12 +4,23 @@ endif
 if exists('g:neomux_loaded') && g:neomux_loaded
     finish
 endif
+
+
 let g:neomux_loaded = 1
 
 " set script-wide vars
 let s:this_folder = fnamemodify(resolve(expand('<sfile>:p')), ':h')
 let s:os = systemlist("uname -s")[0]
 let s:arch = systemlist("uname -m")[0]
+let s:bin_folder = printf("%s/bin", s:this_folder)
+let s:platform_bin_folder = printf("%s/%s.%s.bin", s:this_folder, s:os, s:arch)
+
+" Set PATH and EDITOR vars for sub by subshells/processes
+" TODO: make this configurable
+" add bin folder to the *end* of the path so that nvr or other tools
+" installed by user will take precedence
+let $PATH=printf("%s:%s:%s", s:bin_folder, $PATH, s:platform_bin_folder)
+let $EDITOR=printf("%s/nmux", s:bin_folder)
 
 function! s:NeomuxMain()
     " Set default key bindings if no user defined maps present
@@ -110,14 +121,6 @@ function! NeomuxTerm(...)
     if a:0 > 0
         let l:term_cmd = a:1
     endif
-
-    let l:bin_folder = printf("%s/bin", s:this_folder)
-    let l:platform_bin_folder = printf("%s/%s.%s.bin", s:this_folder, s:os, s:arch)
-
-    " add bin folder to the *end* of the path so that nvr or other tools
-    " installed by user will take precedence
-    let $PATH=printf("%s:%s:%s", l:bin_folder, $PATH, l:platform_bin_folder)
-    let $EDITOR=printf("%s/nmux", l:bin_folder)
 
     if exists("l:term_cmd")
         execute printf("term! %s", l:term_cmd)
