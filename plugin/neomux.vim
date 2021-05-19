@@ -179,10 +179,17 @@ function! WinSwap(tgt)
 endfunction
 
 function! NeomuxSendCtrlW()
-    call chansend(b:terminal_job_id, "")
+    call NeomuxSendKeys("")
 endfunction
 
 function! NeomuxSend(keys)
+    " compatibility shim, will be removed in future versions.
+    " This temporary shim is provided in case 3rd party code is still calling `NeomuxSend()`
+    echom "`NeomuxSend()` is deprecated! Please use `NeomuxSendKeys()` instead."
+    call NeomuxSendKeys(a:keys)
+endfunction
+
+function! NeomuxSendKeys(keys)
     call chansend(b:terminal_job_id, a:keys)
 endfunction
 
