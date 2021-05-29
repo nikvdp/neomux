@@ -210,6 +210,9 @@ function! NeomuxAddWinNumLabels()
         endfunction
         call airline#add_statusline_func('NeomuxAirlineHelper')
 
+    elseif &runtimepath =~ 'lualine'
+        " TODO: consider automatically updating lualine to include neomux
+        " window 
     else
         if &statusline !~ g:neomux_win_num_status
             let &statusline = &statusline . g:neomux_win_num_status
