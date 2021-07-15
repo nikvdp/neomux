@@ -321,7 +321,7 @@ Key bindings: ~
 - 'g:neomux_start_term_split_map' - Default: '<C-w>t'. This map controls what
   keys start a Neomux term in a ':split' window.
 
-- 'g:neomux_start_term_vsplit_map' - Default: '<C-w>t'. This map controls
+- 'g:neomux_start_term_vsplit_map' - Default: '<C-w>T'. This map controls
   what keys start a Neomux term in a ':vsplit' window.
 
 - 'g:neomux_winjump_map_prefix' - Default: '<C-w>'. In Neomux you
