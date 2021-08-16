@@ -1,21 +1,4 @@
-<!-- blurb1
-I spend my days back-and-forthing between files in vim and various terminal windows, and always found neovim's terminal support a bit lacking, so I made a plugin to fix it: [neomux][neomux].
-
-It lets you do lots of cool things with neovim's `:term` emulator:
-
-- Easily jump between neovim windows, even when you have lots of them (no more `<C-w>l<C-w>l<C-w>l` to get to the 3rd window on the right)
-- Pipe commands from the shell into a neovim window (and back to the shell) via stdin/stdout
-- Get and set the contents of vim registers from the command line. 
-
-It's been a definite improvement to my quality of life, sharing it here in the hopes it'll help others too!
-
-[neomux]: https://github.com/nikvdp/neomux
-[neovim-remote]: https://github.com/mhinz/neovim-remote
-
--->
-
-<!-- blurb2
-Neomux, a neovim <> terminal integration plugin
+# Neomux, a neovim <> terminal integration plugin
 
 Neomux packages and wraps [neovim-remote][neovim-remote] goodness into your
 neovim terminals so you can work with neovim's `:term` emulator in some
@@ -30,24 +13,6 @@ interesting new ways. Here's some of the things it lets you do:
 
 It's definitely been a big quality of life improvement for me, maybe it will be
 useful for others too!
--->
-
-
-
-# Neomux
-
-Ever wished you could yank a line of text from your terminal and paste it into 
-a shell script you're working on? Or that you could pipe the output of a command 
-into a vim window or register?
-
-With Neomux you can. Neomux is an opinionated (but highly customizable) plugin
-for neovim that integrates your shell and text-editing experience, allowing you
-to control neovim from shells running inside neovim.
-
-In addition to integrating the shell and neovim experience, neomux also
-includes some sugar for dealing with windows: you can swap the locations of
-windows on-screen and jump directly to a window (no more `<C-w>l<C-w>l<C-w>l`
-to move over 3 windows) with a single key-mapping.
 
 <p align="center">
   <img width="75%" src="https://nikvdp.com/images/neomux-2-window-numbers.gif">
@@ -56,7 +21,7 @@ to move over 3 windows) with a single key-mapping.
 
 # Quickstart
 
-Install neomux, start a shell with `:Neomux` (mapped to `<Leader>sh` by
+Install neomux, start a neomux shell with `:Neomux` (mapped to `<Leader>sh` by
 default), and use `vw <win_num> <file>` and friends to open files in vim
 windows from the shell.
 
