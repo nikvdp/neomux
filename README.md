@@ -56,7 +56,7 @@ to move over 3 windows) with a single key-mapping.
 
 # Quickstart
 
-Install neomux, start a shell with `:NeomuxTerm` (mapped to `<Leader>sh` by
+Install neomux, start a shell with `:Neomux` (mapped to `<Leader>sh` by
 default), and use `vw <win_num> <file>` and friends to open files in vim
 windows from the shell.
 
