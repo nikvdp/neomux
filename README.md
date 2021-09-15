@@ -243,6 +243,8 @@ to streamline working with neovim.
 
 - ### `vp [register]`
   paste data from a vim register (`@"` if no register specified).
+- ### `e <file>`
+  Open  `<file>`  in current window.
 - ### `s <file>`
   Open `<file>` in a horizontal split.
 - ### `vs <file>`

@@ -1,4 +1,4 @@
-*neomux.txt*  Neomux
+*neomux*  Neomux
 
 ===============================================================================
 Contents ~
@@ -17,7 +17,7 @@ Contents ~
  6. CLI helper reference                          |neomux-cli-helper-reference|
    1. 'vw <win_num> <file>'                                   |vw-win_num-file|
    2. 'vp [register]'                                             |vp-register|
-   3. 'e <file>'                                                       e-file
+   3. 'e <file>'                                                       |e-file|
    4. 's <file>'                                                       |s-file|
    5. 'vs <file>'                                                     |vs-file|
    6. 't <file>'                                                       |t-file|
@@ -33,26 +33,30 @@ Contents ~
                                                           *neomux-introduction*
 Introduction ~
 
-Ever wished you could yank a line of text from your terminal and paste it into
-a shell script you're working on? Or that you could pipe the output of a
-command into a vim window or register?
+Neomux packages and wraps neovim-remote [1] goodness into your neovim terminals
+so you can work with neovim's ':term' emulator in some interesting new ways.
+Here's some of the things it lets you do:
 
-With Neomux you can. Neomux is an opinionated (but highly customizable) plugin
-for neovim that integrates your shell and text-editing experience, allowing you
-to control neovim from shells running inside neovim.
+- Pipe commands from the shell into a neovim window (and back to the shell)
+  via stdin/stdout
 
-In addition to integrating the shell and neovim experience, neomux also
-includes some sugar for dealing with windows: you can swap the locations of
-windows on-screen and jump directly to a window (no more '<C-w>l<C-w>l<C-w>l'
-to move over 3 windows) with a single key-mapping.
+- Easily jump to any neovim windows with 3 keystrokes, even when you have
+  lots of splits and windows in-between (no more lll to get to the 3rd window
+  on the right)
 
-Image: (see reference [1])
+- Get and set the contents of vim registers from the command line via
+  stdin/stdout.
+
+It's definitely been a big quality of life improvement for me, maybe it will be
+useful for others too!
+
+Image: (see reference [2])
 
 ===============================================================================
                                                             *neomux-quickstart*
 Quickstart ~
 
-Install neomux, start a shell with ':Neomux' (mapped to '<Leader>sh' by
+Install neomux, start a neomux shell with ':Neomux' (mapped to '<Leader>sh' by
 default), and use 'vw <win_num> <file>' and friends to open files in vim
 windows from the shell.
 
@@ -64,8 +68,8 @@ Installation ~
 
 1. Install neovim.
 2. Install this plugin into neovim via your favorite plugin manager (vim-
-   plug [2] is a good place to start)
-3. (Optional, for speed) install neovim-remote [3].
+   plug [3] is a good place to start)
+3. (Optional, for speed) install neovim-remote [1].
 
 ===============================================================================
                                                                  *neomux-usage*
@@ -162,8 +166,8 @@ Opening file*s* in new window*s*: *s*, 'v*s*', and (kind of) 't'
 
 Image: (see reference [5])
 
-The simplest of the new neomux shell commands are e, |s|, 'vs' and 't'. These
-stand for edit, |s|plit, 'v'ertical-|s|plit, and 't'ab, and are straightforward to
+The simplest of the new neomux shell commands are |s|, 'vs' and 't'. These
+stand for |s|plit, 'v'ertical-|s|plit, and 't'ab, and are straightforward to
 use.
 
 If you have a neomux shell open and wanted to open a file you were looking at
@@ -177,7 +181,7 @@ vertical split, or a new tab, respectively.
 -------------------------------------------------------------------------------
 Working with windows by window-number: *vw* and '*vw*p'
 
-Image: (see reference [1])
+Image: (see reference [2])
 
 One of the most commonly used neomux commands is |vw| (vim-window), it allows
 you to open a file in an _already open_ window.
@@ -331,34 +335,27 @@ Key bindings: ~
 - 'g:neomux_start_term_vsplit_map' - Default: '<C-w>T'. This map controls
   what keys start a Neomux term in a ':vsplit' window.
 
-- 'g:neomux_winjump_map_prefix' - Default: '<C-w>'. In Neomux you
-  can jump to any open window by hitting '<C-w><win_num>' (e.g. '<C-w>2'
-  jumps to window 2. Change this if you want to jump to a different window
-  with a different mapping.
+- 'g:neomux_winjump_map_prefix' - Default: '<C-w>'. In Neomux you can jump to
+  any open window by hitting '<C-w><win_num>' (e.g. '<C-w>2' jumps to window
+  2. Change this if you want to jump to a different window with a different
+  mapping.
 
-  **NOTE:** this is a prefix map, so whatever key you specify will have 9 new
-  mappings generated, one for each window. E.g. if you change this to '<C-b>',
-  you would hit '<C-b>2' to move to window 2.
+**NOTE:** this is a prefix map, so whatever key you specify will have 9 new
+mappings generated, one for each window. E.g. if you change this to '<C-b>',
+you would hit '<C-b>2' to move to window 2. - 'g:neomux_winswap_map_prefix' -
+Default: '<Leader>s'. You can swap the current window with any other window by
+hitting '<Leader>s<win_num>'. Change this if you don't want to use '<Leader>s'
+for this map.
 
-- 'g:neomux_winswap_map_prefix' - Default: '<Leader>s'. You can swap
-  the current window with any other window by hitting '<Leader>s<win_num>'.
-  Change this if you don't want to use '<Leader>s' for this map.
-
-  **NOTE:** like 'g:neomux_winjump_map_prefix', this is a prefix map, so if
-  you change it to '<Leader>b' it would create 9 new mappings, and you'd swap
-  the current window with window #2 with '<Leader>b2'.
-
-- 'g:neomux_yank_buffer_map' - Default: '<Leader>by'. Yank a buffer to be
-  pasted later.
-
-- 'g:neomux_paste_buffer_map' - Default: '<Leader>bp'. Paste a previously
-  yanked buffer into the current window.
-
-- 'g:neomux_term_sizefix_map' - Default: '<Leader>sf'. Fix a neomux term window
-  that is the wrong size
-
-- 'g:neomux_exit_term_mode_map' - Default: '<C-s>'. Get out of insert mode when
-  inside a neomux terminal window.
+**NOTE:** like 'g:neomux_winjump_map_prefix', this is a prefix map, so if you
+change it to '<Leader>b' it would create 9 new mappings, and you'd swap the
+current window with window #2 with '<Leader>b2'. - 'g:neomux_yank_buffer_map' -
+Default: '<Leader>by'. Yank a buffer to be pasted later. -
+'g:neomux_paste_buffer_map' - Default: '<Leader>bp'. Paste a previously yanked
+buffer into the current window. - 'g:neomux_term_sizefix_map' - Default:
+'<Leader>sf'. Fix a neomux term window that is the wrong size -
+'g:neomux_exit_term_mode_map' - Default: '<C-s>'. Get out of insert mode when
+inside a neomux terminal window.
 
 -------------------------------------------------------------------------------
                                                           *neomux-other-config*
@@ -377,7 +374,8 @@ Other config ~
   '%{WindowNumber()}' will be replaced by the window number itself.
 
 If you have airline [9] installed neomux will attempt to add it to your
-airline. If this doesn't work for you please leave an issue!
+airline. If this doesn't work for you please leave an issue! **However, be sure
+to configure your plugin manager to load neomux _after_ the airline plugin.**
 
 - 'g:neomux_dont_fix_term_ctrlw_map' - By default you can't get out of a
   neovim terminal window with '<C-w>' the way you can from a normal vim
@@ -401,7 +399,7 @@ Miscellanea / troubleshooting ~
 - If you want a simple way to send keys to a neomux terminal session you can
   do so via the 'NeomuxSend(keys)' function.
 
-- Neomux relies heavily on the excellent neovim-remote [3], and includes
+- Neomux relies heavily on the excellent neovim-remote [1], and includes
   amd64 binaries for neovim-remote for MacOS and Linux as they are the most
   popular platforms. If you're on Windows or using another chipset (e.g.
   Raspberry pi/ARM) you will need to install python and 'pip' manually, and
@@ -412,9 +410,9 @@ Miscellanea / troubleshooting ~
                                                             *neomux-references*
 References ~
 
-[1] https://nikvdp.com/images/neomux-2-window-numbers.gif
-[2] https://github.com/junegunn/vim-plug
-[3] https://github.com/mhinz/neovim-remote
+[1] https://github.com/mhinz/neovim-remote
+[2] https://nikvdp.com/images/neomux-2-window-numbers.gif
+[3] https://github.com/junegunn/vim-plug
 [4] https://nikvdp.com/post/neomux
 [5] https://nikvdp.com/images/neomux-1-new-windows.gif
 [6] https://en.wikipedia.org/wiki/Process_substitution
