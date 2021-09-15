@@ -1,3 +1,8 @@
+e() {
+    # split
+    nvr --remote "$@"
+}
+
 s() {
     # split
     nvr --remote -o "$@"

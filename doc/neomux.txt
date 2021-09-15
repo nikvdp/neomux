@@ -17,11 +17,12 @@ Contents ~
  6. CLI helper reference                          |neomux-cli-helper-reference|
    1. 'vw <win_num> <file>'                                   |vw-win_num-file|
    2. 'vp [register]'                                             |vp-register|
-   3. 's <file>'                                                       |s-file|
-   4. 'vs <file>'                                                     |vs-file|
-   5. 't <file>'                                                       |t-file|
-   6. 'vcd <path>'                                                   |vcd-path|
-   7. |vpwd|
+   3. 'e <file>'                                                       e-file
+   4. 's <file>'                                                       |s-file|
+   5. 'vs <file>'                                                     |vs-file|
+   6. 't <file>'                                                       |t-file|
+   7. 'vcd <path>'                                                   |vcd-path|
+   8. |vpwd|
  7. Customization                                        |neomux-customization|
    1. Key bindings:
    2. Other config                                        |neomux-other-config|
@@ -161,8 +162,8 @@ Opening file*s* in new window*s*: *s*, 'v*s*', and (kind of) 't'
 
 Image: (see reference [5])
 
-The simplest of the new neomux shell commands are |s|, 'vs' and 't'. These
-stand for |s|plit, 'v'ertical-|s|plit, and 't'ab, and are straightforward to
+The simplest of the new neomux shell commands are e, |s|, 'vs' and 't'. These
+stand for edit, |s|plit, 'v'ertical-|s|plit, and 't'ab, and are straightforward to
 use.
 
 If you have a neomux shell open and wanted to open a file you were looking at
@@ -272,6 +273,12 @@ register 'a', which you could then paste in vim by doing e.g. '"aP'
     'vp [register]' ~
 
   paste data from a vim register (  '@"'  if no register specified).
+
+- -------------------------------------------------------------------------------
+                                                                       *e-file*
+    'e <file>' ~
+
+  Open  '<file>'  in current window.
 
 - -------------------------------------------------------------------------------
                                                                        *s-file*
