@@ -89,7 +89,7 @@ on a vanilla neovim install):
 - `<C-w>t` - Start a new neomux term above the current window (`:split`)
 - `<C-w>T` - Start a new neomux term to the left of the current window (`:vsplit`)
 - `<C-w>[1-9]` - move the cursor directly to the window specified (e.g.
-  `<C-w>w3` would move the cursor to window 3)
+  `<C-w>3` would move the cursor to window 3)
 - `<Leader>s[1-9]` - swap the current window with another window. (e.g.
   `<Leader>s3` would make your current window switch places with window #3)
 - `<C-s>` - Exit insert mode while in a neomux shell. This is just an alias for
