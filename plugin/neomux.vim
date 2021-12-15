@@ -99,15 +99,16 @@ function! NeomuxYankBuffer(...)
     endif
 
     stopinsert
-    let s:yanked_buffers[l:register] = bufnr("%")
-    echo printf("Yanked buffer #%s to register '%s'.", s:yanked_buffers[l:register], l:register)
+    let s:yanked_buffers[l:register] = {"buf": bufnr("%"), "line": line(".")}
+    echo printf("Yanked buffer #%s to register '%s'.", s:yanked_buffers[l:register].buf, l:register)
 endfunction
 
 function! NeomuxPasteBuffer(...)
     let l:register = a:0 > 0 ? a:1 : "default"
     stopinsert
-    execute printf(":b!%s", s:yanked_buffers[l:register])
-    echo printf("Pasted buffer #%s from register '%s'", s:yanked_buffers[l:register], l:register)
+    execute printf(":b!%s", s:yanked_buffers[l:register].buf)
+    execute s:yanked_buffers[l:register].line
+    echo printf("Pasted buffer #%s from register '%s'", s:yanked_buffers[l:register].buf, l:register)
 endfunction
 
 function! NeomuxResizeWindow()
