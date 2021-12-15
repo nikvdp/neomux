@@ -99,7 +99,7 @@ function! NeomuxYankBuffer(...)
     endif
 
     stopinsert
-    let s:yanked_buffers[l:register] = {"buf": bufnr("%"), "line": line(".")}
+    let s:yanked_buffers[l:register] = { "buf": bufnr("%"), "line": line("."), "col": col(".") }
     echo printf("Yanked buffer #%s to register '%s'.", s:yanked_buffers[l:register].buf, l:register)
 endfunction
 
@@ -108,6 +108,8 @@ function! NeomuxPasteBuffer(...)
     stopinsert
     execute printf(":b!%s", s:yanked_buffers[l:register].buf)
     execute s:yanked_buffers[l:register].line
+    normal 0 
+    execute printf("normal %sl", s:yanked_buffers[l:register].col - 1)
     echo printf("Pasted buffer #%s from register '%s'", s:yanked_buffers[l:register].buf, l:register)
 endfunction
 
