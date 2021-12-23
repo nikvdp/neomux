@@ -30,11 +30,15 @@ vbpaste () {
     nvr --remote-expr "@$register"
 }
 
-
 vcd () {
     # switch *neovim's* working dir to $1
     local dir="$(abspath "${1:-$PWD}")"
     nvr -c "chdir $dir"
+}
+
+cdv() {
+    # cd to the parent neovim's current working dir
+    cd "$(vpwd)"
 }
 
 vpwd() {
