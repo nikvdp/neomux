@@ -25,12 +25,12 @@ vbcopy() {
     nvr -c "let @$register=\"$(echo "$inp" | sed -E 's/(["\])/\\\1/g')\""
 }
 
-vbpaste () {
+vbpaste() {
     local register="${1:-@\"}"
     nvr --remote-expr "@$register"
 }
 
-vcd () {
+vcd() {
     # switch *neovim's* working dir to $1
     local dir="$(abspath "${1:-$PWD}")"
     nvr -c "chdir $dir"
@@ -73,22 +73,21 @@ abspath() {
     else
         in_path="$1"
     fi
-    echo "$in_path"|(
+    echo "$in_path" | (
         IFS=/
         read -a parr
         declare -a outp
         for i in "${parr[@]}"; do
             case "$i" in
-            ''|.)
+            '' | .)
                 continue
                 ;;
             ..)
                 len=${#outp[@]}
-                if ((len == 0))
-                then
+                if ((len == 0)); then
                     continue
                 else
-                    unset outp[$((len-1))] 
+                    unset outp[$((len - 1))]
                 fi
                 ;;
             *)
