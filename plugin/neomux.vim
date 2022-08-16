@@ -35,7 +35,7 @@ function! s:NeomuxMain()
         if !exists('g:neomux_set_win_to_cur_pos_prefix')
             let g:neomux_set_win_to_cur_pos_prefix = "<Leader>vp"
         endif
-        call EnableSetWinToCurPosMaps()
+        call NeomuxEnableSetWinToCurPosMaps()
     endif
     if !exists('g:neomux_winswap_map_prefix') | let g:neomux_winswap_map_prefix =  "<Leader>s" | endif
     if !exists('g:neomux_yank_buffer_map') | let g:neomux_yank_buffer_map = "<Leader>by" | endif
@@ -179,18 +179,17 @@ function! EnableWinJump(...)
     endwhile
 endfunction
 
-function! EnableSetWinToCurPosMaps(...)
+function! NeomuxEnableSetWinToCurPosMaps(...)
     " Mappings to set ANOTHER window to the current win's buffer and cursor
     " position
     let l:key = a:0 > 0 ? a:1 : g:neomux_set_win_to_cur_pos_prefix
-    let l:i = 1
-    while l:i <= 9
+    for i in [1,2,3,4,5,6,7,8,9]
         execute printf('nnoremap %s%s <cmd>call NeomuxSetWinToCurrentPos(%s)<CR>', l:key, l:i, l:i)
-        " if has("nvim")
-        "     execute printf('tnoremap %s%s <C-\><C-n><cmd>call NeomuxSetWinToCurrentPos(%s)<CR>', l:key, l:i, l:i)
-        " endif
+        if has("nvim")
+            execute printf('tnoremap %s%s <C-\><C-n><cmd>call NeomuxSetWinToCurrentPos(%s)<CR>', l:key, l:i, l:i)
+        endif
         let l:i = l:i + 1
-    endwhile
+    endfor
 endfunction
 
 function! WinSwap(tgt)
