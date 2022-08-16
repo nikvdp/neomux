@@ -112,6 +112,7 @@ function! NeomuxSetWinToCurrentPos(tgt_win)
     execute l:cur_pos.line
     normal 0 
     execute printf("normal %sl", l:cur_pos.col - 1)
+    stopinsert
 endfunction
 
 function! NeomuxYankBuffer(...)
