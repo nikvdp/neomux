@@ -24,11 +24,19 @@ let $EDITOR=printf("%s/nmux", s:bin_folder)
 
 function! s:NeomuxMain()
     " Set default key bindings if no user defined maps present
+    " TODO: use a dict of vars and defaults and iterate through it, below is
+    "       getting unwieldy. maybe use lua?
     if !exists('g:neomux_start_term_map') | let g:neomux_start_term_map = '<Leader>sh' | endif
     if !exists('g:neomux_start_term_split_map') | let g:neomux_start_term_split_map = '<C-w>t' | endif
     if !exists('g:neomux_start_term_vsplit_map') | let g:neomux_start_term_vsplit_map = '<C-w>T' | endif
     if !exists('g:neomux_winjump_map_prefix') | let g:neomux_winjump_map_prefix = "<C-w>" | endif
-    if !exists('g:neomux_set_win_to_cur_pos_prefix') | let g:neomux_set_win_to_cur_pos_prefix = "<Leader>vp" | endif
+    " neomux_enable_set_win_to_cur_pos is experimental, only enable if requested 
+    if exists('g:neomux_enable_set_win_to_cur_pos')
+        if !exists('g:neomux_set_win_to_cur_pos_prefix')
+            let g:neomux_set_win_to_cur_pos_prefix = "<Leader>vp"
+        endif
+        call EnableSetWinToCurPosMaps()
+    endif
     if !exists('g:neomux_winswap_map_prefix') | let g:neomux_winswap_map_prefix =  "<Leader>s" | endif
     if !exists('g:neomux_yank_buffer_map') | let g:neomux_yank_buffer_map = "<Leader>by" | endif
     if !exists('g:neomux_paste_buffer_map') | let g:neomux_paste_buffer_map = '<Leader>bp' | endif
@@ -40,7 +48,6 @@ function! s:NeomuxMain()
     if !exists('g:neomux_dont_fix_term_ctrlw_map') | let g:neomux_dont_fix_term_ctrlw_map = 0 | endif
     if !exists('g:neomux_no_term_autoinsert') | let g:neomux_no_term_autoinsert = 0 | endif
 
-    if exists('g:neomux_enable_set_win_to_cur_pos') | call EnableSetWinToCurPosMaps() | endif
 
     command! Neomux call NeomuxTerm()
 
