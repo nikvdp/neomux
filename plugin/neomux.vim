@@ -28,6 +28,7 @@ function! s:NeomuxMain()
     if !exists('g:neomux_start_term_split_map') | let g:neomux_start_term_split_map = '<C-w>t' | endif
     if !exists('g:neomux_start_term_vsplit_map') | let g:neomux_start_term_vsplit_map = '<C-w>T' | endif
     if !exists('g:neomux_winjump_map_prefix') | let g:neomux_winjump_map_prefix = "<C-w>" | endif
+    if !exists('g:neomux_set_win_to_cur_pos_prefix') | let g:neomux_set_win_to_cur_pos_prefix = "<Leader>vp" | endif
     if !exists('g:neomux_winswap_map_prefix') | let g:neomux_winswap_map_prefix =  "<Leader>s" | endif
     if !exists('g:neomux_yank_buffer_map') | let g:neomux_yank_buffer_map = "<Leader>by" | endif
     if !exists('g:neomux_paste_buffer_map') | let g:neomux_paste_buffer_map = '<Leader>bp' | endif
@@ -75,7 +76,9 @@ function! s:NeomuxMain()
         execute printf('map %s%s :call WinSwap("%s")<CR>', g:neomux_winswap_map_prefix, i, i)
     endfor
 
-    call EnableWinJump()
+    if exists('g:neomux_enable_set_win_to_cur_pos')
+        call EnableWinJump()
+    endif
 
     execute printf('noremap %s :split<CR>:call NeomuxTerm()<CR>', g:neomux_start_term_split_map)
     execute printf('noremap %s :vsplit<CR>:call NeomuxTerm()<CR>', g:neomux_start_term_vsplit_map)
@@ -89,6 +92,17 @@ function! s:NeomuxMain()
 
     " term size-fix map
     execute printf('noremap %s <C-\><C-n><Esc>:call NeomuxResizeWindow()<CR>', g:neomux_term_sizefix_map)
+endfunction
+
+function! NeomuxSetWinToCurrentPos(tgt_win)
+    let l:cur_pos = { "buf": bufnr("%"), "line": line("."), "col": col(".") }
+    stopinsert
+    execute printf("%swincmd w", a:tgt_win) 
+    execute printf(":b!%s", l:cur_pos.buf)
+
+    execute l:cur_pos.line
+    normal 0 
+    execute printf("normal %sl", l:cur_pos.col - 1)
 endfunction
 
 function! NeomuxYankBuffer(...)
@@ -156,6 +170,19 @@ function! EnableWinJump(...)
     endwhile
 endfunction
 
+function! EnableSetWinToCurPosMaps(...)
+    " Mappings to set ANOTHER window to the current win's buffer and cursor
+    " position
+    let l:key = a:0 > 0 ? a:1 : g:neomux_set_win_to_cur_pos_prefix
+    let l:i = 1
+    while l:i <= 9
+        execute printf('nnoremap %s%s <cmd>call NeomuxSetWinToCurrentPos(%s)<CR>', l:key, l:i, l:i)
+        " if has("nvim")
+        "     execute printf('tnoremap %s%s <C-\><C-n><cmd>call NeomuxSetWinToCurrentPos(%s)<CR>', l:key, l:i, l:i)
+        " endif
+        let l:i = l:i + 1
+    endwhile
+endfunction
 
 function! WinSwap(tgt)
     " hidden needs to be on to prevent buffers from geting deleted while it's
