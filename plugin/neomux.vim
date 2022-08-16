@@ -40,6 +40,8 @@ function! s:NeomuxMain()
     if !exists('g:neomux_dont_fix_term_ctrlw_map') | let g:neomux_dont_fix_term_ctrlw_map = 0 | endif
     if !exists('g:neomux_no_term_autoinsert') | let g:neomux_no_term_autoinsert = 0 | endif
 
+    if exists('g:neomux_enable_set_win_to_cur_pos') | call EnableSetWinToCurPosMaps() | endif
+
     command! Neomux call NeomuxTerm()
 
     call NeomuxAddWinNumLabels()
