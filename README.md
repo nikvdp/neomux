@@ -1,4 +1,4 @@
-# Neomux, a neovim <> terminal integration plugin
+# Neomux, control Neovim from shells running inside Neovim.
 
 Neomux packages and wraps [neovim-remote][neovim-remote] goodness into your
 neovim terminals so you can work with neovim's `:term` emulator in some
@@ -10,9 +10,6 @@ interesting new ways. Here's some of the things it lets you do:
   window on the right)
 - Get and set the contents of vim registers from the command line via stdin/stdout.
 
-
-It's definitely been a big quality of life improvement for me, maybe it will be
-useful for others too!
 
 <p align="center">
   <img width="75%" src="https://nikvdp.com/images/neomux-2-window-numbers.gif">
