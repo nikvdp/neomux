@@ -1,4 +1,4 @@
-# Neomux, control Neovim from shells running inside Neovim.
+# Neomux - control Neovim from shells running inside Neovim.
 
 Neomux packages and wraps [neovim-remote][neovim-remote] goodness into your
 neovim terminals so you can work with neovim's `:term` emulator in some
