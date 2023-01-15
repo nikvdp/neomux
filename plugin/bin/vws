@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+
+SCRIPT_LOCATION="$( cd "$( dirname "$0" )" && pwd )"
+
+source "$SCRIPT_LOCATION/funcs.sh"
+
+vimwindowsplit "$@"

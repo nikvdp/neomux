@@ -66,6 +66,17 @@ vimwindow() {
     fi
 }
 
+# (vws from the command line) -- open a file in the window with the specified
+# number in a split
+vimwindowsplit() {
+    # remote nvim open file $2 in window $1
+    local win="$1"
+    local file="$2"
+    nvr -cc "${win}wincmd w" -c "split"
+    vimwindow "$win" "$file"
+}
+
+
 abspath() {
     local in_path
     if [[ ! "$1" =~ ^/ ]]; then
