@@ -228,6 +228,9 @@ to streamline working with neovim.
   ``` bash
   ls | vw 2 -
   ```
+- ### `vws <win_num> <file>` 
+  Like `vw`, but perform a horizontal split on `<win_num>` before opening `<file>` there.
+
 - ### `vc [register]` 
   copy data into a vim register (`@"` if no register specified). Example:
 
@@ -251,8 +254,8 @@ to streamline working with neovim.
 - ### `vcd <path>`
   Switch neovim's working dir to `<path>`.
 - ### `vpwd`
-  Print neovim's working dir.  Useful with `cd "$(vpwd)"` to move the shell to
-  neovim's current working dir.
+  Print neovim's working dir. Useful in combination with `cd` (eg `cd
+  "$(vpwd)"`) to quickly cd to neovim's working dir
 
 
 <!--

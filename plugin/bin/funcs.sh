@@ -54,6 +54,7 @@ vim-window-print() {
     # nvr --remote-send a
 }
 
+# (vw from the command line) -- open a file in the window with the specified number
 vimwindow() {
     # remote nvim open file $2 in window $1
     local win="$1"
