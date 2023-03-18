@@ -42,8 +42,8 @@ cdv() {
 }
 
 vpwd() {
-    # print vim's current working dir
-    nvr --remote-expr "getcwd()"
+  # print vim's current working dir (-1,-1) tells vim to return the global working dir
+    nvr --remote-expr "getcwd(-1,-1)"
 }
 
 vim-window-print() {
