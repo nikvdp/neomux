@@ -29,6 +29,7 @@ function! s:NeomuxMain()
     if !exists('g:neomux_start_term_map') | let g:neomux_start_term_map = '<Leader>sh' | endif
     if !exists('g:neomux_start_term_split_map') | let g:neomux_start_term_split_map = '<C-w>t' | endif
     if !exists('g:neomux_start_term_vsplit_map') | let g:neomux_start_term_vsplit_map = '<C-w>T' | endif
+    if !exists('g:neomux_start_term_noconfirm') | let g:neomux_start_term_noconfirm = 0 | endif
     if !exists('g:neomux_winjump_map_prefix') | let g:neomux_winjump_map_prefix = "<C-w>" | endif
     " neomux_enable_set_win_to_cur_pos is experimental, only enable if requested 
     if exists('g:neomux_enable_set_win_to_cur_pos')
@@ -77,8 +78,16 @@ function! s:NeomuxMain()
         execute printf('inoremap %s <Esc>', g:neomux_exit_term_mode_map)
     endif
 
+    " If g:neomux_start_term_noconfirm is set, use an extra <CR> to skip
+    " confirmation of term-start commands
+    if g:neomux_start_term_noconfirm == 0
+      let l:neomux_start_term_noconfirm_str = ''
+    else
+      let l:neomux_start_term_noconfirm_str = '<CR>'
+    endif
+
     " set neomux start term map
-    execute printf("noremap %s :Neomux<CR>", g:neomux_start_term_map)
+    execute printf("noremap %s :Neomux<CR>%s", g:neomux_start_term_map, l:neomux_start_term_noconfirm_str)
 
     " set winswap mappings
     for i in [1,2,3,4,5,6,7,8,9]
@@ -89,10 +98,10 @@ function! s:NeomuxMain()
         call EnableWinJump()
     endif
 
-    execute printf('noremap %s :split<CR>:call NeomuxTerm()<CR>', g:neomux_start_term_split_map)
-    execute printf('noremap %s :vsplit<CR>:call NeomuxTerm()<CR>', g:neomux_start_term_vsplit_map)
-    execute printf('tnoremap %s <C-\><C-n>:split<CR>:call NeomuxTerm()<CR>', g:neomux_start_term_split_map)
-    execute printf('tnoremap %s <C-\><C-n>:vsplit<CR>:call NeomuxTerm()<CR>', g:neomux_start_term_vsplit_map)
+    execute printf('noremap %s :split<CR>:call NeomuxTerm()<CR>%s', g:neomux_start_term_split_map, l:neomux_start_term_noconfirm_str)
+    execute printf('noremap %s :vsplit<CR>:call NeomuxTerm()<CR>%s', g:neomux_start_term_vsplit_map, l:neomux_start_term_noconfirm_str)
+    execute printf('tnoremap %s <C-\><C-n>:split<CR>:call NeomuxTerm()<CR>%s', g:neomux_start_term_split_map, l:neomux_start_term_noconfirm_str)
+    execute printf('tnoremap %s <C-\><C-n>:vsplit<CR>:call NeomuxTerm()<CR>%s', g:neomux_start_term_vsplit_map, l:neomux_start_term_noconfirm_str)
 
     " Yank current buffer
     execute printf('map %s :call NeomuxYankBuffer()<CR>', g:neomux_yank_buffer_map)
