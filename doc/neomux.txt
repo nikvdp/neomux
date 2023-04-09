@@ -392,12 +392,10 @@ to configure your plugin manager to load neomux _after_ the airline plugin.**
   use neovim's default '<C-\><C-n>', you can disable it by setting
   'g:neomux_no_exit_term_map' to '1'.
 
-- '`g:neomux_start_term_noconfirm`' - By default neomux will confirm the commands
-  to run when any of the '`g:neomux_start_term_*map`' keys are executed
-  ("Press ENTER or type command to continue"). If you don't want this
-  confirmation and would rather these map keys just open the new terminal
-  immediately, you can disable the confirmation by setting
-  `'g:neomux_start_term_noconfirm`' to `1`.
+- 'g:neomux_hitenter_fix' - There is an issue [10] when using 'cmdheight=0' that
+  causes hit-enter confirmations in neovim when any of the 
+  'g:neomux_start_term_*map' keys are executed. Until the issue is fixed, you
+  can work around it by setting 'g:neomux_hitenter_fix' to '1'.
 
 -------------------------------------------------------------------------------
                                            *neomux-miscellanea-troubleshooting*
@@ -426,5 +424,6 @@ References ~
 [7] https://nikvdp.com/images/neomux-3-registers.gif
 [8] https://www.brianstorti.com/vim-registers/
 [9] https://github.com/vim-airline/vim-airline
+[10] https://github.com/neovim/neovim/issues/20380
 
 vim: ft=help
