@@ -343,6 +343,19 @@ Configure neomux by setting any of these variables in your `.vimrc` / `init.vim`
   neovim's default `<C-\><C-n>`, you can disable it by setting
   `g:neomux_no_exit_term_map` to `1`.
 
+- `g:neomux_hitenter_fix` - There is 
+  [an issue](https://github.com/neovim/neovim/issues/20380) when using 
+  `cmdheight=0` that causes hit-enter confirmations in neovim when any of the 
+  `g:neomux_start_term_*map` keys are executed. Until the issue is fixed, you
+  can work around it by setting `g:neomux_hitenter_fix` to `1`.
+
+- `g:neomux_hitenter_fix` - By default neomux will confirm the commands
+  to run when any of the `g:neomux_start_term_*map` keys are executed
+  ("Press ENTER or type command to continue"). If you don't want this
+  confirmation and would rather these map keys just open the new terminal
+  immediately, you can disable the confirmation by setting
+  `g:neomux_hitenter_fix` to `1`.
+
 ### Miscellanea / troubleshooting
 
 - If you want a simple way to send keys to a neomux terminal session you can do
