@@ -179,11 +179,10 @@ function! EnableWinJump(...)
     " adapted from this SO post: http://stackoverflow.com/questions/6403716/shortcut-for-moving-between-vim-windows
     let l:key = a:0 > 0 ? a:1 : g:neomux_winjump_map_prefix
     let i = 1
-    while i <= 9
-        execute printf('nnoremap %s%s :%swincmd w<CR>', l:key, i, i)
-        if has("nvim")
-            execute printf('tnoremap %s%s <C-\><C-n>:%swincmd w<CR>', l:key, i, i)
-        endif
+    while i <= 10
+        " treat 10 as 0 (for 10th window)
+        execute printf('nnoremap %s%s :%swincmd w<CR>', l:key, i == 10 ? 0 : i, i)
+        execute printf('tnoremap %s%s <C-\><C-n>:%swincmd w<CR>', l:key,i == 10 ? 0 : i, i)
         let i = i + 1
     endwhile
 endfunction
