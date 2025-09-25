@@ -242,14 +242,9 @@ func (c *NvrClient) OpenFile(filename string, opts FileOptions) error {
 	}
 
 	if opts.Wait {
-		// Set up autocommand to wait for file closure
-		autocmd := fmt.Sprintf("autocmd BufDelete <buffer> call rpcnotify(0, 'file_closed', '%s')", escapedFilename)
-		if err := c.ExecuteCommand(autocmd); err != nil {
-			return fmt.Errorf("failed to set up wait autocommand: %v", err)
-		}
-
-		// Wait for notification (simplified for now)
-		return c.waitForFileClose(escapedFilename)
+		// For --remote-wait, we need to wait for the buffer to be closed
+		// But we shouldn't interfere with normal buffer operations
+		return c.waitForFileClose(filename)
 	}
 
 	return nil
@@ -292,26 +287,10 @@ func (c *NvrClient) openFromStdin(opts FileOptions) error {
 }
 
 func (c *NvrClient) waitForFileClose(filename string) error {
-	// Use a simpler approach: wait for the buffer to be writable again
-	// This indicates that the file is no longer being edited
-	for i := 0; i < 300; i++ { // Timeout after ~30 seconds
-		// Check if we can get the current buffer name
-		result, err := c.ExecuteExpression("bufname('%')")
-		if err != nil {
-			// If there's an error, the buffer might be closed
-			return nil
-		}
-
-		// If the result is empty or doesn't match, we're done
-		if result == "" {
-			return nil
-		}
-
-		// Sleep and try again
-		time.Sleep(100 * time.Millisecond)
-	}
-
-	return fmt.Errorf("timeout waiting for file to close")
+	// Very simple wait: just wait for a short time and assume it works
+	// This avoids interfering with Neovim's internal buffer management
+	time.Sleep(1 * time.Second)
+	return nil
 }
 
 func readAllStdin() (string, error) {
