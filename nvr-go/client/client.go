@@ -7,6 +7,7 @@ import (
 	"io"
 	"net"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -26,8 +27,8 @@ type FileOptions struct {
 	UseTab          bool
 	HorizontalSplit bool
 	VerticalSplit   bool
-	Wait           bool
-	FromStdin      bool
+	Wait            bool
+	FromStdin       bool
 }
 
 type Operation struct {
@@ -57,9 +58,9 @@ type RPCNotification struct {
 }
 
 type NvrClient struct {
-	conn     net.Conn
-	nextID   uint64
-	mu       sync.Mutex
+	conn   net.Conn
+	nextID uint64
+	mu     sync.Mutex
 }
 
 func NewNvrClient(socketPath string) (*NvrClient, error) {
@@ -123,6 +124,71 @@ func (c *NvrClient) ExecuteExpression(expr string) (string, error) {
 		return "", err
 	}
 	return fmt.Sprintf("%v", result), nil
+}
+
+func (c *NvrClient) withDeferredBufReadPost(fn func() error) error {
+	optionValue, err := c.Call("nvim_get_option", "eventignore")
+	if err != nil {
+		return fmt.Errorf("failed to read eventignore: %v", err)
+	}
+
+	currentIgnore, _ := optionValue.(string)
+	needsSuppression := !eventListed(currentIgnore, "BufReadPost")
+	if needsSuppression {
+		updated := currentIgnore
+		if strings.TrimSpace(updated) == "" {
+			updated = "BufReadPost"
+		} else {
+			updated = fmt.Sprintf("%s,%s", updated, "BufReadPost")
+		}
+
+		if _, err := c.Call("nvim_set_option", "eventignore", updated); err != nil {
+			return fmt.Errorf("failed to set eventignore: %v", err)
+		}
+	}
+
+	err = fn()
+
+	if needsSuppression {
+		if _, restoreErr := c.Call("nvim_set_option", "eventignore", currentIgnore); restoreErr != nil {
+			if err == nil {
+				err = fmt.Errorf("failed to restore eventignore: %v", restoreErr)
+			}
+		}
+
+		if err == nil {
+			if execErr := c.ExecuteCommand("doautocmd BufReadPost"); execErr != nil {
+				err = fmt.Errorf("failed to replay BufReadPost autocommands: %v", execErr)
+			}
+		}
+	}
+
+	return err
+}
+
+func eventListed(list string, event string) bool {
+	if strings.TrimSpace(list) == "" {
+		return false
+	}
+
+	for _, part := range strings.Split(list, ",") {
+		if strings.TrimSpace(part) == event {
+			return true
+		}
+	}
+	return false
+}
+
+func (c *NvrClient) fnameEscape(path string) (string, error) {
+	// Call Neovim's fnameescape() function
+	result, err := c.Call("nvim_call_function", "fnameescape", []interface{}{path})
+	if err != nil {
+		return "", err
+	}
+	if escaped, ok := result.(string); ok {
+		return escaped, nil
+	}
+	return "", fmt.Errorf("fnameescape returned non-string")
 }
 
 // Test function to verify connection
@@ -224,32 +290,59 @@ func (c *NvrClient) readResponse() (*RPCResponse, error) {
 	}
 }
 
-
 func (c *NvrClient) OpenFile(filename string, opts FileOptions) error {
-	var command string
-
 	if opts.FromStdin {
 		return c.openFromStdin(opts)
 	}
 
-	// Escape filename for vim command
-	escapedFilename := escapeVimString(filename)
-
-	switch {
-	case opts.UseTab:
-		command = fmt.Sprintf("tabedit %s", escapedFilename)
-	case opts.HorizontalSplit:
-		// Like Python nvr: use 'split' command directly
-		command = fmt.Sprintf("split %s", escapedFilename)
-	case opts.VerticalSplit:
-		// Like Python nvr: use 'vsplit' command directly
-		command = fmt.Sprintf("vsplit %s", escapedFilename)
-	default:
-		command = fmt.Sprintf("edit %s", escapedFilename)
+	// Convert to absolute path like Python nvr
+	absPath := filename
+	if !strings.HasPrefix(filename, "/") && !strings.HasPrefix(filename, "~") {
+		if abs, err := filepath.Abs(filename); err == nil {
+			absPath = abs
+		}
 	}
 
-	if err := c.ExecuteCommand(command); err != nil {
-		return fmt.Errorf("failed to execute open command: %v", err)
+	// Use fnameescape like Python nvr
+	escapedPath, err := c.fnameEscape(absPath)
+	if err != nil {
+		// Fallback to simple escaping
+		escapedPath = escapeVimString(absPath)
+	}
+
+	// Get current shortmess and temporarily modify it like Python nvr
+	shortmessResult, _ := c.Call("nvim_get_option", "shortmess")
+	oldShortmess := ""
+	if sm, ok := shortmessResult.(string); ok {
+		oldShortmess = sm
+	}
+
+	// Remove 'F' from shortmess temporarily
+	newShortmess := strings.ReplaceAll(oldShortmess, "F", "")
+	c.Call("nvim_set_option", "shortmess", newShortmess)
+
+	// Build and execute the command
+	var command string
+	switch {
+	case opts.UseTab:
+		command = fmt.Sprintf("tabedit %s", escapedPath)
+	case opts.HorizontalSplit:
+		command = fmt.Sprintf("split %s", escapedPath)
+	case opts.VerticalSplit:
+		command = fmt.Sprintf("vsplit %s", escapedPath)
+	default:
+		command = fmt.Sprintf("edit %s", escapedPath)
+	}
+
+	openErr := c.withDeferredBufReadPost(func() error {
+		return c.ExecuteCommand(command)
+	})
+
+	// Restore shortmess
+	c.Call("nvim_set_option", "shortmess", oldShortmess)
+
+	if openErr != nil {
+		return fmt.Errorf("failed to execute open command: %v", openErr)
 	}
 
 	// Like Python nvr: balance windows after splits
@@ -261,7 +354,6 @@ func (c *NvrClient) OpenFile(filename string, opts FileOptions) error {
 
 	if opts.Wait {
 		// For --remote-wait, we need to wait for the buffer to be closed
-		// But we shouldn't interfere with normal buffer operations
 		return c.waitForFileClose(filename)
 	}
 
