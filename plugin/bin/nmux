@@ -1,2 +1,2 @@
 #!/usr/bin/env bash
-nvr -cc vsplit --remote-wait "$@"
+exec nvr -cc vsplit --remote-wait "$@"
