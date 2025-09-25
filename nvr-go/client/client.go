@@ -206,46 +206,148 @@ func (c *NvrClient) readResponse() (*RPCResponse, error) {
 }
 
 func extractMeaningfulData(data []byte) interface{} {
-	// Simple heuristic to extract meaningful data from msgpack
-	// Look for string patterns or numeric values
+	// Improved msgpack parser to extract actual results
+	// The response format is: [1, msgid, error, result]
+	// We need to skip the first 4 bytes (array marker + 3 elements) and parse the result
 
-	for i := 0; i < len(data)-1; i++ {
-		// Look for string format markers
-		if data[i] >= 0xA0 && data[i] <= 0xBF { // Fixstr format
-			strLen := int(data[i] & 0x1F)
-			if i+1+strLen <= len(data) {
-				return string(data[i+1 : i+1+strLen])
-			}
-		} else if data[i] == 0xDB { // str32 format
-			if i+5 <= len(data) {
-				strLen := int(data[i+1])<<24 | int(data[i+2])<<16 | int(data[i+3])<<8 | int(data[i+4])
-				if i+5+strLen <= len(data) {
-					return string(data[i+5 : i+5+strLen])
-				}
-			}
-		} else if data[i] == 0xDA { // str16 format
-			if i+3 <= len(data) {
-				strLen := int(data[i+1])<<8 | int(data[i+2])
-				if i+3+strLen <= len(data) {
-					return string(data[i+3 : i+3+strLen])
-				}
-			}
-		}
+	if len(data) < 4 {
+		return "unknown"
 	}
 
-	// Fallback: try to interpret as numeric
-	if len(data) >= 1 {
-		switch data[0] {
-		case 0x00: // positive fixint
-			return int(data[0])
-		case 0xCC: // uint8
-			if len(data) >= 2 {
-				return int(data[1])
+	// Skip the array header (0x94) and first 3 elements (type, msgid, error)
+	pos := 1 // After array marker
+
+	// Skip type (1 byte)
+	pos++
+
+	// Skip msgid (variable length)
+	if pos < len(data) {
+		pos = skipMsgpackElement(data, pos)
+	}
+
+	// Skip error (variable length)
+	if pos < len(data) {
+		pos = skipMsgpackElement(data, pos)
+	}
+
+	// Now we should be at the result
+	if pos < len(data) {
+		return parseMsgpackValue(data, pos)
+	}
+
+	return "unknown"
+}
+
+func skipMsgpackElement(data []byte, pos int) int {
+	if pos >= len(data) {
+		return pos
+	}
+
+	marker := data[pos]
+
+	switch {
+	case marker >= 0x00 && marker <= 0x7F: // positive fixint
+		return pos + 1
+	case marker >= 0x80 && marker <= 0x8F: // fixmap
+		elements := int(marker & 0x0F)
+		for i := 0; i < elements*2; i++ {
+			pos = skipMsgpackElement(data, pos+1)
+		}
+		return pos
+	case marker >= 0x90 && marker <= 0x9F: // fixarray
+		elements := int(marker & 0x0F)
+		for i := 0; i < elements; i++ {
+			pos = skipMsgpackElement(data, pos+1)
+		}
+		return pos
+	case marker >= 0xA0 && marker <= 0xBF: // fixstr
+		strLen := int(marker & 0x1F)
+		return pos + 1 + strLen
+	case marker == 0xC0: // nil
+		return pos + 1
+	case marker == 0xC2: // false
+		return pos + 1
+	case marker == 0xC3: // true
+		return pos + 1
+	case marker == 0xCC: // uint8
+		return pos + 2
+	case marker == 0xCD: // uint16
+		return pos + 3
+	case marker == 0xCE: // uint32
+		return pos + 5
+	case marker == 0xCF: // uint64
+		return pos + 9
+	case marker == 0xD0: // int8
+		return pos + 2
+	case marker == 0xD1: // int16
+		return pos + 3
+	case marker == 0xD2: // int32
+		return pos + 5
+	case marker == 0xD3: // int64
+		return pos + 9
+	case marker == 0xDA: // str16
+		if pos+3 <= len(data) {
+			strLen := int(data[pos+1])<<8 | int(data[pos+2])
+			return pos + 3 + strLen
+		}
+		return pos + 1
+	case marker == 0xDB: // str32
+		if pos+5 <= len(data) {
+			strLen := int(data[pos+1])<<24 | int(data[pos+2])<<16 | int(data[pos+3])<<8 | int(data[pos+4])
+			return pos + 5 + strLen
+		}
+		return pos + 1
+	case marker == 0xDC: // array16
+		if pos+3 <= len(data) {
+			elements := int(data[pos+1])<<8 | int(data[pos+2])
+			currentPos := pos + 3
+			for i := 0; i < elements; i++ {
+				currentPos = skipMsgpackElement(data, currentPos)
 			}
-		case 0xCD: // uint16
-			if len(data) >= 3 {
-				return int(data[1])<<8 | int(data[2])
+			return currentPos
+		}
+		return pos + 1
+	default:
+		return pos + 1 // Skip unknown
+	}
+}
+
+func parseMsgpackValue(data []byte, pos int) interface{} {
+	if pos >= len(data) {
+		return "unknown"
+	}
+
+	marker := data[pos]
+
+	switch {
+	case marker >= 0x00 && marker <= 0x7F: // positive fixint
+		return int(marker)
+	case marker >= 0xA0 && marker <= 0xBF: // fixstr
+		strLen := int(marker & 0x1F)
+		if pos+1+strLen <= len(data) {
+			return string(data[pos+1 : pos+1+strLen])
+		}
+	case marker == 0xDA: // str16
+		if pos+3 <= len(data) {
+			strLen := int(data[pos+1])<<8 | int(data[pos+2])
+			if pos+3+strLen <= len(data) {
+				return string(data[pos+3 : pos+3+strLen])
 			}
+		}
+	case marker == 0xDB: // str32
+		if pos+5 <= len(data) {
+			strLen := int(data[pos+1])<<24 | int(data[pos+2])<<16 | int(data[pos+3])<<8 | int(data[pos+4])
+			if pos+5+strLen <= len(data) {
+				return string(data[pos+5 : pos+5+strLen])
+			}
+		}
+	case marker == 0xCC: // uint8
+		if pos+2 <= len(data) {
+			return int(data[pos+1])
+		}
+	case marker == 0xCD: // uint16
+		if pos+3 <= len(data) {
+			return int(data[pos+1])<<8 | int(data[pos+2])
 		}
 	}
 
@@ -327,15 +429,24 @@ func (c *NvrClient) OpenFile(filename string, opts FileOptions) error {
 	case opts.UseTab:
 		command = fmt.Sprintf("tabedit %s", escapedFilename)
 	case opts.HorizontalSplit:
-		command = fmt.Sprintf("split | edit %s", escapedFilename)
+		// Like Python nvr: use 'split' command directly
+		command = fmt.Sprintf("split %s", escapedFilename)
 	case opts.VerticalSplit:
-		command = fmt.Sprintf("vsplit | edit %s", escapedFilename)
+		// Like Python nvr: use 'vsplit' command directly
+		command = fmt.Sprintf("vsplit %s", escapedFilename)
 	default:
 		command = fmt.Sprintf("edit %s", escapedFilename)
 	}
 
 	if err := c.ExecuteCommand(command); err != nil {
 		return fmt.Errorf("failed to execute open command: %v", err)
+	}
+
+	// Like Python nvr: balance windows after splits
+	if opts.HorizontalSplit || opts.VerticalSplit {
+		if err := c.ExecuteCommand("wincmd ="); err != nil {
+			return fmt.Errorf("failed to balance windows: %v", err)
+		}
 	}
 
 	if opts.Wait {
