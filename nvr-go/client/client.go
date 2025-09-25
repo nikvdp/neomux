@@ -9,6 +9,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/vmihailenco/msgpack/v5"
 )
@@ -291,11 +292,49 @@ func (c *NvrClient) openFromStdin(opts FileOptions) error {
 }
 
 func (c *NvrClient) waitForFileClose(filename string) error {
-	// Simplified wait mechanism
-	// In a full implementation, this would use nvim_buf_attach or similar
-	// For now, just wait a short time and assume the operation completes
-	_, err := c.ExecuteExpression("sleep 100m")
-	return err
+	// Set up autocommand to wait for file closure
+	autocmd := fmt.Sprintf("autocmd BufDelete <buffer> call rpcnotify(0, 'file_closed', '%s')", filename)
+	if err := c.ExecuteCommand(autocmd); err != nil {
+		return fmt.Errorf("failed to set up wait autocommand: %v", err)
+	}
+
+	// Wait for notification by listening for RPC notifications
+	return c.waitForNotification("file_closed")
+}
+
+func (c *NvrClient) waitForNotification(expectedMsg string) error {
+	// Simple notification listener - wait for the expected notification
+	// This is a simplified version that checks for notifications periodically
+	for i := 0; i < 100; i++ { // Timeout after ~10 seconds
+		// Try to read a notification
+		c.conn.SetReadDeadline(time.Now().Add(100 * time.Millisecond))
+
+		// Check if there's data to read
+		buf := make([]byte, 1024)
+		n, err := c.conn.Read(buf)
+		if err != nil {
+			if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
+				continue // No data yet, try again
+			}
+			// Other error, break
+			break
+		}
+
+		if n > 0 {
+			// Try to decode as notification
+			decoder := msgpack.NewDecoder(bytes.NewReader(buf[:n]))
+			var notification []interface{}
+			if decodeErr := decoder.Decode(&notification); decodeErr == nil {
+				if len(notification) >= 2 {
+					if msg, ok := notification[0].(string); ok && msg == expectedMsg {
+						return nil // Got the expected notification
+					}
+				}
+			}
+		}
+	}
+
+	return fmt.Errorf("timeout waiting for notification: %s", expectedMsg)
 }
 
 func readAllStdin() (string, error) {
