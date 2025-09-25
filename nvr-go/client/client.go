@@ -50,6 +50,12 @@ type RPCResponse struct {
 	Result interface{} `msgpack:"result"`
 }
 
+type RPCNotification struct {
+	Type   int           `msgpack:"type"`
+	Method string        `msgpack:"method"`
+	Args   []interface{} `msgpack:"args"`
+}
+
 type NvrClient struct {
 	conn     net.Conn
 	nextID   uint64
@@ -287,10 +293,235 @@ func (c *NvrClient) openFromStdin(opts FileOptions) error {
 }
 
 func (c *NvrClient) waitForFileClose(filename string) error {
-	// Very simple wait: just wait for a short time and assume it works
-	// This avoids interfering with Neovim's internal buffer management
-	time.Sleep(1 * time.Second)
+	// Get the current channel ID for notifications
+	channelID, err := c.getChannelID()
+	if err != nil {
+		return fmt.Errorf("failed to get channel ID: %v", err)
+	}
+
+	// Get current buffer for buffer-specific autocommands
+	bufID, err := c.getCurrentBuffer()
+	if err != nil {
+		return fmt.Errorf("failed to get current buffer: %v", err)
+	}
+
+	// Set up autocommands exactly like Python nvr does
+	// Python uses <buffer> without ID, which refers to the current buffer
+	setupCmds := []string{
+		"augroup nvr",
+		fmt.Sprintf("autocmd BufDelete <buffer> silent! call rpcnotify(%d, \"BufDelete\")", channelID),
+		fmt.Sprintf("autocmd VimLeave * if exists(\"v:exiting\") && v:exiting > 0 | silent! call rpcnotify(%d, \"Exit\", v:exiting) | endif", channelID),
+		"augroup END",
+	}
+
+	for _, cmd := range setupCmds {
+		if err := c.ExecuteCommand(cmd); err != nil {
+			return fmt.Errorf("failed to setup autocommands: %v", err)
+		}
+	}
+
+	// Manage buffer variables like Python nvr does
+	// Python: bvars['nvr'] = [chanid] or [chanid] + bvars['nvr']
+	if err := c.manageBufVars(bufID, channelID); err != nil {
+		return fmt.Errorf("failed to manage buffer variables: %v", err)
+	}
+
+	// Wait for notifications
+	return c.waitForNotifications()
+}
+
+func (c *NvrClient) getCurrentBuffer() (int, error) {
+	result, err := c.Call("nvim_get_current_buf")
+	if err != nil {
+		return 0, err
+	}
+
+	// Handle different return types
+	switch v := result.(type) {
+	case int:
+		return v, nil
+	case uint64:
+		return int(v), nil
+	default:
+		return 0, fmt.Errorf("invalid buffer ID type")
+	}
+}
+
+func (c *NvrClient) manageBufVars(bufID int, channelID int) error {
+	// Get current buffer variables
+	result, err := c.Call("nvim_buf_get_var", bufID, "nvr")
+
+	var existingChannels []interface{}
+	if err != nil {
+		// Variable doesn't exist yet, that's ok
+		existingChannels = []interface{}{}
+	} else {
+		// Variable exists, get the list
+		switch v := result.(type) {
+		case []interface{}:
+			existingChannels = v
+		default:
+			// If it's not a list, start fresh
+			existingChannels = []interface{}{}
+		}
+	}
+
+	// Check if our channel ID is already in the list
+	channelExists := false
+	for _, ch := range existingChannels {
+		switch v := ch.(type) {
+		case int:
+			if v == channelID {
+				channelExists = true
+				break
+			}
+		case int64:
+			if int(v) == channelID {
+				channelExists = true
+				break
+			}
+		case uint64:
+			if int(v) == channelID {
+				channelExists = true
+				break
+			}
+		}
+	}
+
+	// Add our channel ID at the beginning if it doesn't exist
+	if !channelExists {
+		newChannels := []interface{}{channelID}
+		newChannels = append(newChannels, existingChannels...)
+
+		// Set the buffer variable
+		_, err = c.Call("nvim_buf_set_var", bufID, "nvr", newChannels)
+		if err != nil {
+			return fmt.Errorf("failed to set buffer variable: %v", err)
+		}
+	}
+
 	return nil
+}
+
+func (c *NvrClient) getChannelID() (int, error) {
+	// Get the current channel ID (Python nvr uses self.server.channel_id)
+	// In msgpack-rpc, we need to call nvim_get_api_info and extract channel_id
+	result, err := c.Call("nvim_get_api_info")
+	if err != nil {
+		return 0, err
+	}
+
+	// nvim_get_api_info returns [channel_id, api_metadata]
+	if info, ok := result.([]interface{}); ok && len(info) >= 1 {
+		switch v := info[0].(type) {
+		case int:
+			return v, nil
+		case int64:
+			return int(v), nil
+		case uint64:
+			return int(v), nil
+		default:
+			return 0, fmt.Errorf("unexpected channel ID type: %T", v)
+		}
+	}
+
+	return 0, fmt.Errorf("failed to parse channel ID from api_info")
+}
+
+func (c *NvrClient) waitForNotifications() error {
+	// Set a timeout to prevent hanging indefinitely
+	timeout := time.After(5 * time.Minute)
+
+	for {
+		select {
+		case <-timeout:
+			return fmt.Errorf("timeout waiting for buffer to close")
+		default:
+			// Try to read a notification with a short timeout
+			c.conn.SetReadDeadline(time.Now().Add(100 * time.Millisecond))
+
+			// Read notification
+			notification, err := c.readNotification()
+			if err != nil {
+				if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
+					// No notification available, check if we should continue
+					continue
+				}
+				// Other error, break
+				break
+			}
+
+			// Handle notification
+			if notification != nil {
+				switch notification.Method {
+				case "BufDelete":
+					// Buffer was deleted, we're done
+					return nil
+				case "Exit":
+					// Neovim is exiting
+					return nil
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
+func (c *NvrClient) readNotification() (*RPCNotification, error) {
+	// Read the entire message into a buffer first
+	buf := make([]byte, 8192)
+	n, err := c.conn.Read(buf)
+	if err != nil {
+		return nil, err
+	}
+
+	// Use msgpack decoder on the buffer
+	decoder := msgpack.NewDecoder(bytes.NewReader(buf[:n]))
+
+	// Notification should be an array: [type, method, args]
+	var notifArray []interface{}
+	if err := decoder.Decode(&notifArray); err != nil {
+		return nil, fmt.Errorf("failed to decode notification: %v", err)
+	}
+
+	if len(notifArray) != 3 {
+		return nil, fmt.Errorf("invalid notification format: expected 3 elements, got %d", len(notifArray))
+	}
+
+	// Handle type conversions
+	var typeInt int
+	switch v := notifArray[0].(type) {
+	case int:
+		typeInt = v
+	case int8:
+		typeInt = int(v)
+	case uint8:
+		typeInt = int(v)
+	default:
+		typeInt = 0
+	}
+
+	// Only process notifications (type 2)
+	if typeInt != 2 {
+		return nil, nil
+	}
+
+	method, ok := notifArray[1].(string)
+	if !ok {
+		return nil, fmt.Errorf("invalid notification method")
+	}
+
+	args, ok := notifArray[2].([]interface{})
+	if !ok {
+		return nil, fmt.Errorf("invalid notification args")
+	}
+
+	return &RPCNotification{
+		Type:   typeInt,
+		Method: method,
+		Args:   args,
+	}, nil
 }
 
 func readAllStdin() (string, error) {
