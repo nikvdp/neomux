@@ -19,6 +19,14 @@ type CLIArgs struct {
 }
 
 func main() {
+	// Check for test flag before parsing
+	for _, arg := range os.Args[1:] {
+		if arg == "--test" {
+			testConnection()
+			return
+		}
+	}
+
 	args := parseArgs(os.Args[1:])
 
 	if len(args.Remote) == 0 && len(args.RemoteWait) == 0 && len(args.RemoteTab) == 0 &&
@@ -32,6 +40,7 @@ func main() {
 		fmt.Println("  -cc <command>         Execute Vim command (alias)")
 		fmt.Println("  -o                    Open file in horizontal split")
 		fmt.Println("  -O                    Open file in vertical split")
+		fmt.Println("  --test                Test connection to Neovim")
 		os.Exit(1)
 	}
 
@@ -108,6 +117,34 @@ func parseArgs(args []string) *CLIArgs {
 
 func findNeovimSocket() (string, error) {
 	return client.FindNeovimSocket()
+}
+
+func testConnection() {
+	fmt.Println("Testing connection to Neovim...")
+
+	socketPath, err := findNeovimSocket()
+	if err != nil {
+		fmt.Printf("Error finding socket: %v\n", err)
+		os.Exit(1)
+	}
+
+	fmt.Printf("Found socket: %s\n", socketPath)
+
+	nvrClient, err := client.NewNvrClient(socketPath)
+	if err != nil {
+		fmt.Printf("Error connecting: %v\n", err)
+		os.Exit(1)
+	}
+	defer nvrClient.Close()
+
+	fmt.Println("Connected successfully!")
+
+	if err := nvrClient.TestConnection(); err != nil {
+		fmt.Printf("Test failed: %v\n", err)
+		os.Exit(1)
+	}
+
+	fmt.Println("Connection test completed successfully!")
 }
 
 func executeCommands(nvrClient *client.NvrClient, args *CLIArgs) error {

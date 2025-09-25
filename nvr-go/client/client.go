@@ -2,8 +2,8 @@ package client
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/binary"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net"
@@ -117,54 +117,200 @@ func (c *NvrClient) ExecuteExpression(expr string) (string, error) {
 	return fmt.Sprintf("%v", result), nil
 }
 
-func (c *NvrClient) sendRequest(req RPCRequest) error {
-	// Use JSON encoding for simplicity (in production, use msgpack)
-	data, err := json.Marshal(req)
+// Test function to verify connection
+func (c *NvrClient) TestConnection() error {
+	// Try to get neovim API info
+	result, err := c.Call("nvim_get_api_info")
 	if err != nil {
-		return fmt.Errorf("failed to marshal request: %v", err)
+		return err
 	}
-
-	// Write length prefix (4 bytes, big endian)
-	length := make([]byte, 4)
-	binary.BigEndian.PutUint32(length, uint32(len(data)))
-
-	// Write length + data
-	if _, err := c.conn.Write(length); err != nil {
-		return fmt.Errorf("failed to write length: %v", err)
-	}
-
-	if _, err := c.conn.Write(data); err != nil {
-		return fmt.Errorf("failed to write data: %v", err)
-	}
-
+	fmt.Printf("API Info: %v\n", result)
 	return nil
 }
 
+func (c *NvrClient) sendRequest(req RPCRequest) error {
+	// Create msgpack array: [type, msgid, method, args]
+	// Type: 0 = request, 1 = response, 2 = notification
+	// Msgid: request ID
+	// Method: method name
+	// Args: arguments array
+
+	var buf bytes.Buffer
+
+	// Format: [0, msgid, method, args]
+	buf.WriteByte(0x94) // Fixarray with 4 elements
+
+	// Type: 0 for request
+	buf.WriteByte(0x00)
+
+	// Message ID
+	if err := encodeUint(&buf, req.ID); err != nil {
+		return err
+	}
+
+	// Method
+	if err := encodeString(&buf, req.Method); err != nil {
+		return err
+	}
+
+	// Args
+	if err := encodeArray(&buf, req.Args); err != nil {
+		return err
+	}
+
+	// Write the message
+	_, err := c.conn.Write(buf.Bytes())
+	return err
+}
+
 func (c *NvrClient) readResponse() (*RPCResponse, error) {
-	// Read length prefix (4 bytes)
-	lengthBuf := make([]byte, 4)
-	if _, err := c.conn.Read(lengthBuf); err != nil {
-		return nil, fmt.Errorf("failed to read length: %v", err)
+	// Read response header (4 bytes for msgpack array format)
+	header := make([]byte, 4)
+	if _, err := c.conn.Read(header); err != nil {
+		return nil, fmt.Errorf("failed to read response header: %v", err)
 	}
 
-	length := binary.BigEndian.Uint32(lengthBuf)
-	if length > 1024*1024 { // 1MB limit
-		return nil, fmt.Errorf("response too large: %d bytes", length)
+	// Check if it's a msgpack array with 4 elements [type, msgid, error, result]
+	if header[0] != 0x94 {
+		return nil, fmt.Errorf("invalid msgpack response format: expected array with 4 elements")
 	}
 
-	// Read response data
-	data := make([]byte, length)
-	if _, err := c.conn.Read(data); err != nil {
-		return nil, fmt.Errorf("failed to read response: %v", err)
+	// For now, we'll implement a simple parser that extracts basic information
+	// A full msgpack decoder would be more complex
+
+	// Read the rest of the response
+	buf := make([]byte, 8192)
+	n, err := c.conn.Read(buf)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response data: %v", err)
 	}
 
-	// Parse as JSON
 	var resp RPCResponse
-	if err := json.Unmarshal(data, &resp); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal response: %v", err)
+	resp.Type = 1 // Response type
+
+	// Try to extract meaningful data from the response
+	// This is a simplified approach - a proper msgpack decoder would be better
+	data := string(buf[:n])
+
+	// Look for string patterns that might be the actual result
+	if len(data) > 0 {
+		// Try to find string content (this is very simplified)
+		resp.Result = extractMeaningfulData(buf[:n])
+	} else {
+		resp.Result = ""
 	}
+
+	resp.Error = nil
 
 	return &resp, nil
+}
+
+func extractMeaningfulData(data []byte) interface{} {
+	// Simple heuristic to extract meaningful data from msgpack
+	// Look for string patterns or numeric values
+
+	for i := 0; i < len(data)-1; i++ {
+		// Look for string format markers
+		if data[i] >= 0xA0 && data[i] <= 0xBF { // Fixstr format
+			strLen := int(data[i] & 0x1F)
+			if i+1+strLen <= len(data) {
+				return string(data[i+1 : i+1+strLen])
+			}
+		} else if data[i] == 0xDB { // str32 format
+			if i+5 <= len(data) {
+				strLen := int(data[i+1])<<24 | int(data[i+2])<<16 | int(data[i+3])<<8 | int(data[i+4])
+				if i+5+strLen <= len(data) {
+					return string(data[i+5 : i+5+strLen])
+				}
+			}
+		} else if data[i] == 0xDA { // str16 format
+			if i+3 <= len(data) {
+				strLen := int(data[i+1])<<8 | int(data[i+2])
+				if i+3+strLen <= len(data) {
+					return string(data[i+3 : i+3+strLen])
+				}
+			}
+		}
+	}
+
+	// Fallback: try to interpret as numeric
+	if len(data) >= 1 {
+		switch data[0] {
+		case 0x00: // positive fixint
+			return int(data[0])
+		case 0xCC: // uint8
+			if len(data) >= 2 {
+				return int(data[1])
+			}
+		case 0xCD: // uint16
+			if len(data) >= 3 {
+				return int(data[1])<<8 | int(data[2])
+			}
+		}
+	}
+
+	return "unknown"
+}
+
+func encodeUint(buf *bytes.Buffer, value uint64) error {
+	if value <= 127 {
+		buf.WriteByte(byte(value))
+	} else if value <= 255 {
+		buf.WriteByte(0xCC) // uint8
+		buf.WriteByte(byte(value))
+	} else if value <= 65535 {
+		buf.WriteByte(0xCD) // uint16
+		binary.Write(buf, binary.BigEndian, uint16(value))
+	} else if value <= 4294967295 {
+		buf.WriteByte(0xCE) // uint32
+		binary.Write(buf, binary.BigEndian, uint32(value))
+	} else {
+		buf.WriteByte(0xCF) // uint64
+		binary.Write(buf, binary.BigEndian, value)
+	}
+	return nil
+}
+
+func encodeString(buf *bytes.Buffer, s string) error {
+	strBytes := []byte(s)
+	if len(strBytes) <= 31 {
+		buf.WriteByte(0xA0 | byte(len(strBytes))) // Fixstr
+	} else if len(strBytes) <= 255 {
+		buf.WriteByte(0xD9) // str8
+		buf.WriteByte(byte(len(strBytes)))
+	} else if len(strBytes) <= 65535 {
+		buf.WriteByte(0xDA) // str16
+		binary.Write(buf, binary.BigEndian, uint16(len(strBytes)))
+	} else {
+		buf.WriteByte(0xDB) // str32
+		binary.Write(buf, binary.BigEndian, uint32(len(strBytes)))
+	}
+	buf.Write(strBytes)
+	return nil
+}
+
+func encodeArray(buf *bytes.Buffer, arr []interface{}) error {
+	if len(arr) <= 15 {
+		buf.WriteByte(0x90 | byte(len(arr))) // Fixarray
+	} else {
+		buf.WriteByte(0xDC) // array16
+		binary.Write(buf, binary.BigEndian, uint16(len(arr)))
+	}
+
+	for _, item := range arr {
+		switch v := item.(type) {
+		case string:
+			encodeString(buf, v)
+		case int:
+			encodeUint(buf, uint64(v))
+		case uint64:
+			encodeUint(buf, v)
+		default:
+			// Fallback to string representation
+			encodeString(buf, fmt.Sprintf("%v", v))
+		}
+	}
+	return nil
 }
 
 func (c *NvrClient) OpenFile(filename string, opts FileOptions) error {
