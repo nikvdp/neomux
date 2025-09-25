@@ -1,22 +1,13 @@
 package main
 
 import (
-	"flag"
 	"fmt"
 	"os"
 	"github.com/neomux/nvr-go/client"
+	"github.com/neomux/nvr-go/parser"
 )
 
-type CLIArgs struct {
-	Remote       []string
-	RemoteWait   []string
-	RemoteTab    []string
-	RemoteExpr   []string
-	Commands     []string
-	HorizontalSplit bool
-	VerticalSplit bool
-	ReadStdin    bool
-}
+type CLIArgs = parser.CLIArgs
 
 func main() {
 	// Check for test flag before parsing
@@ -27,7 +18,11 @@ func main() {
 		}
 	}
 
-	args := parseArgs(os.Args[1:])
+	args, err := parser.ParseArgs(os.Args[1:])
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error parsing arguments: %v\n", err)
+		os.Exit(1)
+	}
 
 	if len(args.Remote) == 0 && len(args.RemoteWait) == 0 && len(args.RemoteTab) == 0 &&
 		len(args.RemoteExpr) == 0 && len(args.Commands) == 0 && !args.ReadStdin {
@@ -41,6 +36,13 @@ func main() {
 		fmt.Println("  -o                    Open file in horizontal split")
 		fmt.Println("  -O                    Open file in vertical split")
 		fmt.Println("  --test                Test connection to Neovim")
+		fmt.Println("  vim-window-print N    Print from window N")
+		fmt.Println("  vimwindow N file     Open file in window N")
+		fmt.Println("  vimwindowsplit N file Split file in window N")
+		fmt.Println("  vbpaste               Paste from clipboard")
+		fmt.Println("  vbcopy text           Copy text to clipboard")
+		fmt.Println("  vpwd                  Print working directory")
+		fmt.Println("  vcd dir               Change directory")
 		os.Exit(1)
 	}
 
@@ -63,57 +65,6 @@ func main() {
 	}
 }
 
-func parseArgs(args []string) *CLIArgs {
-	cli := &CLIArgs{}
-
-	flagSet := flag.NewFlagSet("nvr", flag.ExitOnError)
-	flagSet.BoolVar(&cli.HorizontalSplit, "o", false, "Open file in horizontal split")
-	flagSet.BoolVar(&cli.VerticalSplit, "O", false, "Open file in vertical split")
-
-	var remote, remoteWait, remoteTab, remoteExpr, commands []string
-	flagSet.Func("remote", "Open file in existing window", func(s string) error {
-		remote = append(remote, s)
-		return nil
-	})
-	flagSet.Func("remote-wait", "Open file and wait for completion", func(s string) error {
-		remoteWait = append(remoteWait, s)
-		return nil
-	})
-	flagSet.Func("remote-tab", "Open file in new tab", func(s string) error {
-		remoteTab = append(remoteTab, s)
-		return nil
-	})
-	flagSet.Func("remote-expr", "Evaluate and return result", func(s string) error {
-		remoteExpr = append(remoteExpr, s)
-		return nil
-	})
-	flagSet.Func("c", "Execute Vim command", func(s string) error {
-		commands = append(commands, s)
-		return nil
-	})
-	flagSet.Func("cc", "Execute Vim command (alias)", func(s string) error {
-		commands = append(commands, s)
-		return nil
-	})
-
-	flagSet.Parse(args)
-
-	cli.Remote = remote
-	cli.RemoteWait = remoteWait
-	cli.RemoteTab = remoteTab
-	cli.RemoteExpr = remoteExpr
-	cli.Commands = commands
-
-	// Check for stdin reading
-	for i, arg := range args {
-		if arg == "--remote" && i+1 < len(args) && args[i+1] == "-" {
-			cli.ReadStdin = true
-			break
-		}
-	}
-
-	return cli
-}
 
 func findNeovimSocket() (string, error) {
 	return client.FindNeovimSocket()
@@ -147,7 +98,7 @@ func testConnection() {
 	fmt.Println("Connection test completed successfully!")
 }
 
-func executeCommands(nvrClient *client.NvrClient, args *CLIArgs) error {
+func executeCommands(nvrClient *client.NvrClient, args *parser.CLIArgs) error {
 	// Execute remote expressions first
 	for _, expr := range args.RemoteExpr {
 		result, err := nvrClient.ExecuteExpression(expr)
