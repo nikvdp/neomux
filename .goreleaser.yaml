@@ -25,7 +25,6 @@ archives:
     builds:
       - nvr
     format: tar.gz
-    wrap_in_directory: false
     name_template: >-
       {{ .ProjectName }}_{{ .Version }}_{{- tolower .Os -}}_{{- if eq .Arch "arm" -}}armv{{ .Arm }}{{- else -}}{{ .Arch }}{{- end -}}
 
