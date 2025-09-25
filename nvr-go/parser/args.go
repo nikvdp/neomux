@@ -132,7 +132,25 @@ func ParseArgs(args []string) (*CLIArgs, error) {
 			if i+1 >= len(args) {
 				return nil, fmt.Errorf("%s requires a command argument", arg)
 			}
-			cli.Commands = append(cli.Commands, args[i+1])
+			cmd := args[i+1]
+
+			// Special handling for split commands that should modify file opening
+			// When used with --remote-wait, these should affect how the file is opened
+			if cmd == "vsplit" || cmd == "split" {
+				// Check if next arg is --remote-wait or similar
+				if i+2 < len(args) && strings.HasPrefix(args[i+2], "--remote") {
+					// This is a split directive for the file opening
+					if cmd == "vsplit" {
+						cli.VerticalSplit = true
+					} else {
+						cli.HorizontalSplit = true
+					}
+					i++ // Skip the split command
+					continue
+				}
+			}
+
+			cli.Commands = append(cli.Commands, cmd)
 			i++
 		default:
 			// Check if it's a neomux-style command
