@@ -3,13 +3,14 @@ package client
 import (
 	"bufio"
 	"bytes"
-	"encoding/binary"
 	"fmt"
 	"io"
 	"net"
 	"os"
 	"strings"
 	"sync"
+
+	"github.com/vmihailenco/msgpack/v5"
 )
 
 type OperationType int
@@ -35,17 +36,17 @@ type Operation struct {
 }
 
 type RPCRequest struct {
-	Type   int         `msgpack:"type"`
-	ID     uint64      `msgpack:"id"`
-	Method string      `msgpack:"method"`
+	Type   int           `msgpack:"type"`
+	ID     uint64        `msgpack:"id"`
+	Method string        `msgpack:"method"`
 	Args   []interface{} `msgpack:"args"`
 }
 
 type RPCResponse struct {
-	Type   int           `msgpack:"type"`
-	ID     uint64        `msgpack:"id"`
-	Error  interface{}   `msgpack:"error"`
-	Result interface{}   `msgpack:"result"`
+	Type   int         `msgpack:"type"`
+	ID     uint64      `msgpack:"id"`
+	Error  interface{} `msgpack:"error"`
+	Result interface{} `msgpack:"result"`
 }
 
 type NvrClient struct {
@@ -135,285 +136,75 @@ func (c *NvrClient) sendRequest(req RPCRequest) error {
 	// Method: method name
 	// Args: arguments array
 
-	var buf bytes.Buffer
+	msg := []interface{}{req.Type, req.ID, req.Method, req.Args}
 
-	// Format: [0, msgid, method, args]
-	buf.WriteByte(0x94) // Fixarray with 4 elements
-
-	// Type: 0 for request
-	buf.WriteByte(0x00)
-
-	// Message ID
-	if err := encodeUint(&buf, req.ID); err != nil {
-		return err
-	}
-
-	// Method
-	if err := encodeString(&buf, req.Method); err != nil {
-		return err
-	}
-
-	// Args
-	if err := encodeArray(&buf, req.Args); err != nil {
-		return err
+	data, err := msgpack.Marshal(msg)
+	if err != nil {
+		return fmt.Errorf("failed to marshal request: %v", err)
 	}
 
 	// Write the message
-	_, err := c.conn.Write(buf.Bytes())
+	_, err = c.conn.Write(data)
 	return err
 }
 
 func (c *NvrClient) readResponse() (*RPCResponse, error) {
-	// Read response header (4 bytes for msgpack array format)
-	header := make([]byte, 4)
-	if _, err := c.conn.Read(header); err != nil {
-		return nil, fmt.Errorf("failed to read response header: %v", err)
-	}
-
-	// Check if it's a msgpack array with 4 elements [type, msgid, error, result]
-	if header[0] != 0x94 {
-		return nil, fmt.Errorf("invalid msgpack response format: expected array with 4 elements")
-	}
-
-	// For now, we'll implement a simple parser that extracts basic information
-	// A full msgpack decoder would be more complex
-
-	// Read the rest of the response
+	// Read the entire response into a buffer first
 	buf := make([]byte, 8192)
 	n, err := c.conn.Read(buf)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read response data: %v", err)
+		return nil, fmt.Errorf("failed to read response: %v", err)
 	}
 
-	var resp RPCResponse
-	resp.Type = 1 // Response type
+	// Use msgpack decoder on the buffer
+	decoder := msgpack.NewDecoder(bytes.NewReader(buf[:n]))
 
-	// Try to extract meaningful data from the response
-	// This is a simplified approach - a proper msgpack decoder would be better
-	data := string(buf[:n])
-
-	// Look for string patterns that might be the actual result
-	if len(data) > 0 {
-		// Try to find string content (this is very simplified)
-		resp.Result = extractMeaningfulData(buf[:n])
-	} else {
-		resp.Result = ""
+	// Response should be an array: [type, msgid, error, result]
+	var respArray []interface{}
+	if err := decoder.Decode(&respArray); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %v", err)
 	}
 
-	resp.Error = nil
-
-	return &resp, nil
-}
-
-func extractMeaningfulData(data []byte) interface{} {
-	// Improved msgpack parser to extract actual results
-	// The response format is: [1, msgid, error, result]
-	// We need to skip the first 4 bytes (array marker + 3 elements) and parse the result
-
-	if len(data) < 4 {
-		return "unknown"
+	if len(respArray) != 4 {
+		return nil, fmt.Errorf("invalid response format: expected 4 elements, got %d", len(respArray))
 	}
 
-	// Skip the array header (0x94) and first 3 elements (type, msgid, error)
-	pos := 1 // After array marker
+	// Handle type conversions more flexibly
+	var typeInt int
+	var idInt int
 
-	// Skip type (1 byte)
-	pos++
-
-	// Skip msgid (variable length)
-	if pos < len(data) {
-		pos = skipMsgpackElement(data, pos)
-	}
-
-	// Skip error (variable length)
-	if pos < len(data) {
-		pos = skipMsgpackElement(data, pos)
-	}
-
-	// Now we should be at the result
-	if pos < len(data) {
-		return parseMsgpackValue(data, pos)
-	}
-
-	return "unknown"
-}
-
-func skipMsgpackElement(data []byte, pos int) int {
-	if pos >= len(data) {
-		return pos
-	}
-
-	marker := data[pos]
-
-	switch {
-	case marker >= 0x00 && marker <= 0x7F: // positive fixint
-		return pos + 1
-	case marker >= 0x80 && marker <= 0x8F: // fixmap
-		elements := int(marker & 0x0F)
-		for i := 0; i < elements*2; i++ {
-			pos = skipMsgpackElement(data, pos+1)
-		}
-		return pos
-	case marker >= 0x90 && marker <= 0x9F: // fixarray
-		elements := int(marker & 0x0F)
-		for i := 0; i < elements; i++ {
-			pos = skipMsgpackElement(data, pos+1)
-		}
-		return pos
-	case marker >= 0xA0 && marker <= 0xBF: // fixstr
-		strLen := int(marker & 0x1F)
-		return pos + 1 + strLen
-	case marker == 0xC0: // nil
-		return pos + 1
-	case marker == 0xC2: // false
-		return pos + 1
-	case marker == 0xC3: // true
-		return pos + 1
-	case marker == 0xCC: // uint8
-		return pos + 2
-	case marker == 0xCD: // uint16
-		return pos + 3
-	case marker == 0xCE: // uint32
-		return pos + 5
-	case marker == 0xCF: // uint64
-		return pos + 9
-	case marker == 0xD0: // int8
-		return pos + 2
-	case marker == 0xD1: // int16
-		return pos + 3
-	case marker == 0xD2: // int32
-		return pos + 5
-	case marker == 0xD3: // int64
-		return pos + 9
-	case marker == 0xDA: // str16
-		if pos+3 <= len(data) {
-			strLen := int(data[pos+1])<<8 | int(data[pos+2])
-			return pos + 3 + strLen
-		}
-		return pos + 1
-	case marker == 0xDB: // str32
-		if pos+5 <= len(data) {
-			strLen := int(data[pos+1])<<24 | int(data[pos+2])<<16 | int(data[pos+3])<<8 | int(data[pos+4])
-			return pos + 5 + strLen
-		}
-		return pos + 1
-	case marker == 0xDC: // array16
-		if pos+3 <= len(data) {
-			elements := int(data[pos+1])<<8 | int(data[pos+2])
-			currentPos := pos + 3
-			for i := 0; i < elements; i++ {
-				currentPos = skipMsgpackElement(data, currentPos)
-			}
-			return currentPos
-		}
-		return pos + 1
+	switch v := respArray[0].(type) {
+	case int:
+		typeInt = v
+	case int8:
+		typeInt = int(v)
+	case uint8:
+		typeInt = int(v)
 	default:
-		return pos + 1 // Skip unknown
+		typeInt = 0
 	}
+
+	switch v := respArray[1].(type) {
+	case int:
+		idInt = v
+	case int8:
+		idInt = int(v)
+	case uint8:
+		idInt = int(v)
+	default:
+		idInt = 0
+	}
+
+	resp := &RPCResponse{
+		Type:   typeInt,
+		ID:     uint64(idInt),
+		Error:  respArray[2],
+		Result: respArray[3],
+	}
+
+	return resp, nil
 }
 
-func parseMsgpackValue(data []byte, pos int) interface{} {
-	if pos >= len(data) {
-		return "unknown"
-	}
-
-	marker := data[pos]
-
-	switch {
-	case marker >= 0x00 && marker <= 0x7F: // positive fixint
-		return int(marker)
-	case marker >= 0xA0 && marker <= 0xBF: // fixstr
-		strLen := int(marker & 0x1F)
-		if pos+1+strLen <= len(data) {
-			return string(data[pos+1 : pos+1+strLen])
-		}
-	case marker == 0xDA: // str16
-		if pos+3 <= len(data) {
-			strLen := int(data[pos+1])<<8 | int(data[pos+2])
-			if pos+3+strLen <= len(data) {
-				return string(data[pos+3 : pos+3+strLen])
-			}
-		}
-	case marker == 0xDB: // str32
-		if pos+5 <= len(data) {
-			strLen := int(data[pos+1])<<24 | int(data[pos+2])<<16 | int(data[pos+3])<<8 | int(data[pos+4])
-			if pos+5+strLen <= len(data) {
-				return string(data[pos+5 : pos+5+strLen])
-			}
-		}
-	case marker == 0xCC: // uint8
-		if pos+2 <= len(data) {
-			return int(data[pos+1])
-		}
-	case marker == 0xCD: // uint16
-		if pos+3 <= len(data) {
-			return int(data[pos+1])<<8 | int(data[pos+2])
-		}
-	}
-
-	return "unknown"
-}
-
-func encodeUint(buf *bytes.Buffer, value uint64) error {
-	if value <= 127 {
-		buf.WriteByte(byte(value))
-	} else if value <= 255 {
-		buf.WriteByte(0xCC) // uint8
-		buf.WriteByte(byte(value))
-	} else if value <= 65535 {
-		buf.WriteByte(0xCD) // uint16
-		binary.Write(buf, binary.BigEndian, uint16(value))
-	} else if value <= 4294967295 {
-		buf.WriteByte(0xCE) // uint32
-		binary.Write(buf, binary.BigEndian, uint32(value))
-	} else {
-		buf.WriteByte(0xCF) // uint64
-		binary.Write(buf, binary.BigEndian, value)
-	}
-	return nil
-}
-
-func encodeString(buf *bytes.Buffer, s string) error {
-	strBytes := []byte(s)
-	if len(strBytes) <= 31 {
-		buf.WriteByte(0xA0 | byte(len(strBytes))) // Fixstr
-	} else if len(strBytes) <= 255 {
-		buf.WriteByte(0xD9) // str8
-		buf.WriteByte(byte(len(strBytes)))
-	} else if len(strBytes) <= 65535 {
-		buf.WriteByte(0xDA) // str16
-		binary.Write(buf, binary.BigEndian, uint16(len(strBytes)))
-	} else {
-		buf.WriteByte(0xDB) // str32
-		binary.Write(buf, binary.BigEndian, uint32(len(strBytes)))
-	}
-	buf.Write(strBytes)
-	return nil
-}
-
-func encodeArray(buf *bytes.Buffer, arr []interface{}) error {
-	if len(arr) <= 15 {
-		buf.WriteByte(0x90 | byte(len(arr))) // Fixarray
-	} else {
-		buf.WriteByte(0xDC) // array16
-		binary.Write(buf, binary.BigEndian, uint16(len(arr)))
-	}
-
-	for _, item := range arr {
-		switch v := item.(type) {
-		case string:
-			encodeString(buf, v)
-		case int:
-			encodeUint(buf, uint64(v))
-		case uint64:
-			encodeUint(buf, v)
-		default:
-			// Fallback to string representation
-			encodeString(buf, fmt.Sprintf("%v", v))
-		}
-	}
-	return nil
-}
 
 func (c *NvrClient) OpenFile(filename string, opts FileOptions) error {
 	var command string

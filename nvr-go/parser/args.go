@@ -56,13 +56,60 @@ func ParseArgs(args []string) (*CLIArgs, error) {
 			if i+1 >= len(args) {
 				return nil, fmt.Errorf("--remote requires a file argument")
 			}
-			if args[i+1] == "-" {
-				cli.ReadStdin = true
-				i++
-			} else {
-				cli.Remote = append(cli.Remote, args[i+1])
-				i++
+
+			// Check for split options after --remote
+			var opts FileOptions
+			remainingArgs := args[i+1:]
+			fileIndex := 0
+
+			// Process options until we find the filename
+			for j := 0; j < len(remainingArgs); j++ {
+				nextArg := remainingArgs[j]
+				if nextArg == "-o" {
+					opts.HorizontalSplit = true
+					fileIndex = j + 1
+				} else if nextArg == "-O" {
+					opts.VerticalSplit = true
+					fileIndex = j + 1
+				} else if nextArg == "--remote-wait" {
+					opts.Wait = true
+					fileIndex = j + 1
+				} else if !strings.HasPrefix(nextArg, "-") {
+					// This is the filename
+					fileIndex = j
+					break
+				} else {
+					// Unknown option, treat as filename
+					fileIndex = j
+					break
+				}
 			}
+
+			if fileIndex >= len(remainingArgs) {
+				return nil, fmt.Errorf("--remote requires a file argument")
+			}
+
+			filename := remainingArgs[fileIndex]
+			if filename == "-" {
+				opts.FromStdin = true
+				cli.ReadStdin = true
+			} else {
+				if opts.UseTab {
+					cli.RemoteTab = append(cli.RemoteTab, filename)
+				} else if opts.Wait {
+					cli.RemoteWait = append(cli.RemoteWait, filename)
+				} else if opts.HorizontalSplit {
+					cli.HorizontalSplit = true
+					cli.Remote = append(cli.Remote, filename)
+				} else if opts.VerticalSplit {
+					cli.VerticalSplit = true
+					cli.Remote = append(cli.Remote, filename)
+				} else {
+					cli.Remote = append(cli.Remote, filename)
+				}
+			}
+
+			i += fileIndex + 1 // Skip --remote and all processed args
 		case arg == "--remote-wait":
 			if i+1 >= len(args) {
 				return nil, fmt.Errorf("--remote-wait requires a file argument")
@@ -87,10 +134,6 @@ func ParseArgs(args []string) (*CLIArgs, error) {
 			}
 			cli.Commands = append(cli.Commands, args[i+1])
 			i++
-		case arg == "-o":
-			cli.HorizontalSplit = true
-		case arg == "-O":
-			cli.VerticalSplit = true
 		default:
 			// Check if it's a neomux-style command
 			if isNeomuxCommand(arg) {
