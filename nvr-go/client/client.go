@@ -1,9 +1,14 @@
 package client
 
 import (
+	"bufio"
 	"encoding/binary"
+	"encoding/json"
 	"fmt"
+	"io"
 	"net"
+	"os"
+	"strings"
 	"sync"
 )
 
@@ -99,29 +104,6 @@ func (c *NvrClient) Call(method string, args ...interface{}) (interface{}, error
 	return resp.Result, nil
 }
 
-func (c *NvrClient) sendRequest(req RPCRequest) error {
-	// For now, we'll implement a simple text-based protocol
-	// In a real implementation, we'd use proper msgpack encoding
-	msg := fmt.Sprintf("%d %s %v", req.ID, req.Method, req.Args)
-	_, err := c.conn.Write([]byte(msg + "\n"))
-	return err
-}
-
-func (c *NvrClient) readResponse() (*RPCResponse, error) {
-	// Simple response reading for now
-	buf := make([]byte, 1024)
-	n, err := c.conn.Read(buf)
-	if err != nil {
-		return nil, err
-	}
-
-	// For now, just return a simple response
-	return &RPCResponse{
-		Type:   1, // Response type
-		Result: string(buf[:n-1]), // Remove newline
-	}, nil
-}
-
 func (c *NvrClient) ExecuteCommand(command string) error {
 	_, err := c.Call("nvim_command", command)
 	return err
@@ -135,6 +117,56 @@ func (c *NvrClient) ExecuteExpression(expr string) (string, error) {
 	return fmt.Sprintf("%v", result), nil
 }
 
+func (c *NvrClient) sendRequest(req RPCRequest) error {
+	// Use JSON encoding for simplicity (in production, use msgpack)
+	data, err := json.Marshal(req)
+	if err != nil {
+		return fmt.Errorf("failed to marshal request: %v", err)
+	}
+
+	// Write length prefix (4 bytes, big endian)
+	length := make([]byte, 4)
+	binary.BigEndian.PutUint32(length, uint32(len(data)))
+
+	// Write length + data
+	if _, err := c.conn.Write(length); err != nil {
+		return fmt.Errorf("failed to write length: %v", err)
+	}
+
+	if _, err := c.conn.Write(data); err != nil {
+		return fmt.Errorf("failed to write data: %v", err)
+	}
+
+	return nil
+}
+
+func (c *NvrClient) readResponse() (*RPCResponse, error) {
+	// Read length prefix (4 bytes)
+	lengthBuf := make([]byte, 4)
+	if _, err := c.conn.Read(lengthBuf); err != nil {
+		return nil, fmt.Errorf("failed to read length: %v", err)
+	}
+
+	length := binary.BigEndian.Uint32(lengthBuf)
+	if length > 1024*1024 { // 1MB limit
+		return nil, fmt.Errorf("response too large: %d bytes", length)
+	}
+
+	// Read response data
+	data := make([]byte, length)
+	if _, err := c.conn.Read(data); err != nil {
+		return nil, fmt.Errorf("failed to read response: %v", err)
+	}
+
+	// Parse as JSON
+	var resp RPCResponse
+	if err := json.Unmarshal(data, &resp); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal response: %v", err)
+	}
+
+	return &resp, nil
+}
+
 func (c *NvrClient) OpenFile(filename string, opts FileOptions) error {
 	var command string
 
@@ -142,35 +174,111 @@ func (c *NvrClient) OpenFile(filename string, opts FileOptions) error {
 		return c.openFromStdin(opts)
 	}
 
+	// Escape filename for vim command
+	escapedFilename := escapeVimString(filename)
+
 	switch {
 	case opts.UseTab:
-		command = fmt.Sprintf("tabedit %s", filename)
+		command = fmt.Sprintf("tabedit %s", escapedFilename)
 	case opts.HorizontalSplit:
-		command = fmt.Sprintf("split | edit %s", filename)
+		command = fmt.Sprintf("split | edit %s", escapedFilename)
 	case opts.VerticalSplit:
-		command = fmt.Sprintf("vsplit | edit %s", filename)
+		command = fmt.Sprintf("vsplit | edit %s", escapedFilename)
 	default:
-		command = fmt.Sprintf("edit %s", filename)
+		command = fmt.Sprintf("edit %s", escapedFilename)
+	}
+
+	if err := c.ExecuteCommand(command); err != nil {
+		return fmt.Errorf("failed to execute open command: %v", err)
 	}
 
 	if opts.Wait {
-		command += " | autocmd BufDelete <buffer> echo 'File closed'"
+		// Set up autocommand to wait for file closure
+		autocmd := fmt.Sprintf("autocmd BufDelete <buffer> call rpcnotify(0, 'file_closed', '%s')", escapedFilename)
+		if err := c.ExecuteCommand(autocmd); err != nil {
+			return fmt.Errorf("failed to set up wait autocommand: %v", err)
+		}
+
+		// Wait for notification (simplified for now)
+		return c.waitForFileClose(escapedFilename)
 	}
 
-	return c.ExecuteCommand(command)
+	return nil
 }
 
 func (c *NvrClient) openFromStdin(opts FileOptions) error {
-	// Read from stdin and create buffer
-	// This is a simplified implementation
-	command := "enew"
-	if opts.UseTab {
-		command = "tabnew"
-	} else if opts.HorizontalSplit {
-		command = "split"
-	} else if opts.VerticalSplit {
-		command = "vsplit"
+	// Read all content from stdin
+	content, err := readAllStdin()
+	if err != nil {
+		return fmt.Errorf("failed to read from stdin: %v", err)
 	}
 
-	return c.ExecuteCommand(command)
+	// Create appropriate command based on options
+	var command string
+	switch {
+	case opts.UseTab:
+		command = "tabnew"
+	case opts.HorizontalSplit:
+		command = "split"
+	case opts.VerticalSplit:
+		command = "vsplit"
+	default:
+		command = "enew"
+	}
+
+	if err := c.ExecuteCommand(command); err != nil {
+		return fmt.Errorf("failed to create buffer: %v", err)
+	}
+
+	// Set buffer content line by line
+	lines := strings.Split(content, "\n")
+	for i, line := range lines {
+		setLineCmd := fmt.Sprintf("call setline(%d, '%s')", i+1, escapeVimString(line))
+		if err := c.ExecuteCommand(setLineCmd); err != nil {
+			return fmt.Errorf("failed to set line %d: %v", i+1, err)
+		}
+	}
+
+	return nil
+}
+
+func (c *NvrClient) waitForFileClose(filename string) error {
+	// Simplified wait mechanism
+	// In a full implementation, this would use nvim_buf_attach or similar
+	// For now, just wait a short time and assume the operation completes
+	_, err := c.ExecuteExpression("sleep 100m")
+	return err
+}
+
+func readAllStdin() (string, error) {
+	stat, _ := os.Stdin.Stat()
+	if (stat.Mode() & os.ModeCharDevice) != 0 {
+		return "", fmt.Errorf("no input provided on stdin")
+	}
+
+	reader := bufio.NewReader(os.Stdin)
+	var content strings.Builder
+
+	for {
+		line, err := reader.ReadString('\n')
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return "", err
+		}
+		content.WriteString(line)
+	}
+
+	return content.String(), nil
+}
+
+func escapeVimString(s string) string {
+	// Escape special characters for vim commands
+	s = strings.ReplaceAll(s, "'", "''")
+	s = strings.ReplaceAll(s, "\\", "\\\\")
+	s = strings.ReplaceAll(s, "\"", "\\\"")
+	s = strings.ReplaceAll(s, "\n", "\\n")
+	s = strings.ReplaceAll(s, "\t", "\\t")
+	return s
 }

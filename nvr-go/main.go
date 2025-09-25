@@ -4,7 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"path/filepath"
+	"github.com/neomux/nvr-go/client"
 )
 
 type CLIArgs struct {
@@ -41,14 +41,14 @@ func main() {
 		os.Exit(1)
 	}
 
-	client, err := NewNvrClient(socketPath)
+	nvrClient, err := client.NewNvrClient(socketPath)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error connecting to Neovim: %v\n", err)
 		os.Exit(1)
 	}
-	defer client.Close()
+	defer nvrClient.Close()
 
-	if err := executeCommands(client, args); err != nil {
+	if err := executeCommands(nvrClient, args); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
@@ -107,37 +107,13 @@ func parseArgs(args []string) *CLIArgs {
 }
 
 func findNeovimSocket() (string, error) {
-	// Check NVIM_LISTEN_ADDRESS environment variable
-	if socket := os.Getenv("NVIM_LISTEN_ADDRESS"); socket != "" {
-		return socket, nil
-	}
-
-	// Check NVIM environment variable and derive socket path
-	if nvim := os.Getenv("NVIM"); nvim != "" {
-		socket := filepath.Join("/tmp", nvim+"0")
-		if _, err := os.Stat(socket); err == nil {
-			return socket, nil
-		}
-	}
-
-	// Search for active sockets in /tmp/nvim*/0 pattern
-	matches, err := filepath.Glob("/tmp/nvim*/0")
-	if err != nil {
-		return "", fmt.Errorf("error searching for Neovim sockets: %v", err)
-	}
-
-	if len(matches) == 0 {
-		return "", fmt.Errorf("no Neovim instance found. Is Neovim running with RPC enabled?")
-	}
-
-	// Return the first active socket
-	return matches[0], nil
+	return client.FindNeovimSocket()
 }
 
-func executeCommands(client *NvrClient, args *CLIArgs) error {
+func executeCommands(nvrClient *client.NvrClient, args *CLIArgs) error {
 	// Execute remote expressions first
 	for _, expr := range args.RemoteExpr {
-		result, err := client.ExecuteExpression(expr)
+		result, err := nvrClient.ExecuteExpression(expr)
 		if err != nil {
 			return fmt.Errorf("failed to execute expression '%s': %v", expr, err)
 		}
@@ -146,48 +122,48 @@ func executeCommands(client *NvrClient, args *CLIArgs) error {
 
 	// Execute commands
 	for _, cmd := range args.Commands {
-		if err := client.ExecuteCommand(cmd); err != nil {
+		if err := nvrClient.ExecuteCommand(cmd); err != nil {
 			return fmt.Errorf("failed to execute command '%s': %v", cmd, err)
 		}
 	}
 
 	// Handle file operations
 	for _, file := range args.Remote {
-		opts := FileOptions{
+		opts := client.FileOptions{
 			HorizontalSplit: args.HorizontalSplit,
 			VerticalSplit:   args.VerticalSplit,
 		}
-		if err := client.OpenFile(file, opts); err != nil {
+		if err := nvrClient.OpenFile(file, opts); err != nil {
 			return fmt.Errorf("failed to open file '%s': %v", file, err)
 		}
 	}
 
 	for _, file := range args.RemoteWait {
-		opts := FileOptions{
+		opts := client.FileOptions{
 			HorizontalSplit: args.HorizontalSplit,
 			VerticalSplit:   args.VerticalSplit,
 			Wait:           true,
 		}
-		if err := client.OpenFile(file, opts); err != nil {
+		if err := nvrClient.OpenFile(file, opts); err != nil {
 			return fmt.Errorf("failed to open file '%s': %v", file, err)
 		}
 	}
 
 	for _, file := range args.RemoteTab {
-		opts := FileOptions{
+		opts := client.FileOptions{
 			UseTab: true,
 		}
-		if err := client.OpenFile(file, opts); err != nil {
+		if err := nvrClient.OpenFile(file, opts); err != nil {
 			return fmt.Errorf("failed to open file '%s': %v", file, err)
 		}
 	}
 
 	// Handle stdin reading
 	if args.ReadStdin {
-		opts := FileOptions{
+		opts := client.FileOptions{
 			FromStdin: true,
 		}
-		if err := client.OpenFile("", opts); err != nil {
+		if err := nvrClient.OpenFile("", opts); err != nil {
 			return fmt.Errorf("failed to read from stdin: %v", err)
 		}
 	}
