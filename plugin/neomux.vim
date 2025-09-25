@@ -19,7 +19,7 @@ let s:platform_bin_folder = printf("%s/%s.%s.bin", s:this_folder, s:os, s:arch)
 " TODO: make this configurable
 " add bin folder to the *end* of the path so that nvr or other tools
 " installed by user will take precedence
-let $PATH=printf("%s:%s:%s", $PATH, s:bin_folder, s:platform_bin_folder)
+let $PATH=printf("%s:%s:%s", s:bin_folder, $PATH, s:platform_bin_folder)
 let $EDITOR=printf("%s/nmux", s:bin_folder)
 
 function! s:NeomuxMain()
