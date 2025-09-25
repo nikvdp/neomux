@@ -156,60 +156,72 @@ func (c *NvrClient) sendRequest(req RPCRequest) error {
 }
 
 func (c *NvrClient) readResponse() (*RPCResponse, error) {
-	// Read the entire response into a buffer first
-	buf := make([]byte, 8192)
-	n, err := c.conn.Read(buf)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read response: %v", err)
+	// Keep reading until we get a response (type 1), skipping notifications (type 2)
+	for {
+		// Read the entire message into a buffer first
+		buf := make([]byte, 8192)
+		n, err := c.conn.Read(buf)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read response: %v", err)
+		}
+
+		// Use msgpack decoder on the buffer
+		decoder := msgpack.NewDecoder(bytes.NewReader(buf[:n]))
+
+		// First, check what type of message this is
+		var msgArray []interface{}
+		if err := decoder.Decode(&msgArray); err != nil {
+			return nil, fmt.Errorf("failed to decode message: %v", err)
+		}
+
+		// Get the message type
+		var msgType int
+		if len(msgArray) > 0 {
+			switch v := msgArray[0].(type) {
+			case int:
+				msgType = v
+			case int8:
+				msgType = int(v)
+			case uint8:
+				msgType = int(v)
+			default:
+				msgType = -1
+			}
+		}
+
+		// Type 2 is notification, skip it
+		if msgType == 2 {
+			continue
+		}
+
+		// Type 1 is response, process it
+		if msgType == 1 && len(msgArray) == 4 {
+			// Handle type conversions for response
+			var idInt int
+			switch v := msgArray[1].(type) {
+			case int:
+				idInt = v
+			case int8:
+				idInt = int(v)
+			case uint8:
+				idInt = int(v)
+			default:
+				idInt = 0
+			}
+
+			resp := &RPCResponse{
+				Type:   msgType,
+				ID:     uint64(idInt),
+				Error:  msgArray[2],
+				Result: msgArray[3],
+			}
+
+			return resp, nil
+		}
+
+		// Unknown message type
+		return nil, fmt.Errorf("unexpected message type %d with %d elements", msgType, len(msgArray))
 	}
-
-	// Use msgpack decoder on the buffer
-	decoder := msgpack.NewDecoder(bytes.NewReader(buf[:n]))
-
-	// Response should be an array: [type, msgid, error, result]
-	var respArray []interface{}
-	if err := decoder.Decode(&respArray); err != nil {
-		return nil, fmt.Errorf("failed to decode response: %v", err)
-	}
-
-	if len(respArray) != 4 {
-		return nil, fmt.Errorf("invalid response format: expected 4 elements, got %d", len(respArray))
-	}
-
-	// Handle type conversions more flexibly
-	var typeInt int
-	var idInt int
-
-	switch v := respArray[0].(type) {
-	case int:
-		typeInt = v
-	case int8:
-		typeInt = int(v)
-	case uint8:
-		typeInt = int(v)
-	default:
-		typeInt = 0
-	}
-
-	switch v := respArray[1].(type) {
-	case int:
-		idInt = v
-	case int8:
-		idInt = int(v)
-	case uint8:
-		idInt = int(v)
-	default:
-		idInt = 0
-	}
-
-	resp := &RPCResponse{
-		Type:   typeInt,
-		ID:     uint64(idInt),
-		Error:  respArray[2],
-		Result: respArray[3],
-	}
-
-	return resp, nil
 }
 
 
