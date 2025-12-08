@@ -576,9 +576,9 @@ function! s:TmuxGenerateWrapper() abort
                 \ ], l:session_file)
     
     " Update tmux environment if server is already running
-    call system(printf("tmux -S '%s' set-environment -g NVIM '%s' 2>/dev/null", l:socket_file, l:nvim_socket))
-    call system(printf("tmux -S '%s' set-environment -g NVIM_LISTEN_ADDRESS '%s' 2>/dev/null", l:socket_file, l:nvim_socket))
-    call system(printf("tmux -S '%s' set-environment -g NEOMUX_RC '%s' 2>/dev/null", l:socket_file, l:wrapper_file))
+    call system(printf("tmux -S %s set-environment -g NVIM %s 2>/dev/null", shellescape(l:socket_file), shellescape(l:nvim_socket)))
+    call system(printf("tmux -S %s set-environment -g NVIM_LISTEN_ADDRESS %s 2>/dev/null", shellescape(l:socket_file), shellescape(l:nvim_socket)))
+    call system(printf("tmux -S %s set-environment -g NEOMUX_RC %s 2>/dev/null", shellescape(l:socket_file), shellescape(l:wrapper_file)))
     
     " Set environment variable for shell access
     let $NEOMUX_RC = l:wrapper_file
@@ -619,23 +619,23 @@ endfunction
 function! s:TmuxSetWindowName(socket, tmux_session, name) abort
     " Set the tmux window name for a session
     " Also disables automatic-rename to prevent tmux from overwriting it
-    let l:cmd = printf("tmux -S '%s' rename-window -t '%s' '%s' 2>/dev/null",
-                \ a:socket, a:tmux_session, a:name)
+    let l:cmd = printf("tmux -S %s rename-window -t %s %s 2>/dev/null",
+                \ shellescape(a:socket), shellescape(a:tmux_session), shellescape(a:name))
     call system(l:cmd)
     if v:shell_error
         return 0
     endif
     " Disable automatic rename so tmux doesn't overwrite our name
-    let l:cmd = printf("tmux -S '%s' set-option -t '%s' automatic-rename off 2>/dev/null",
-                \ a:socket, a:tmux_session)
+    let l:cmd = printf("tmux -S %s set-window-option -t %s automatic-rename off 2>/dev/null",
+                \ shellescape(a:socket), shellescape(a:tmux_session))
     call system(l:cmd)
     return 1
 endfunction
 
 function! s:TmuxGetWindowName(socket, tmux_session) abort
     " Get the tmux window name for a session
-    let l:cmd = printf("tmux -S '%s' display-message -t '%s' -p '#{window_name}' 2>/dev/null",
-                \ a:socket, a:tmux_session)
+    let l:cmd = printf("tmux -S %s display-message -t %s -p '#{window_name}' 2>/dev/null",
+                \ shellescape(a:socket), shellescape(a:tmux_session))
     let l:name = trim(system(l:cmd))
     if v:shell_error
         return ''
@@ -725,7 +725,7 @@ endfunction
 function! s:TmuxListWindowsForSession(socket_path) abort
     " List tmux windows/sessions for a given socket
     " Returns a dict of {session_name: window_name}
-    let l:cmd = printf("tmux -S '%s' list-sessions -F '#{session_name}|#{window_name}' 2>/dev/null", a:socket_path)
+    let l:cmd = printf("tmux -S %s list-sessions -F '#{session_name}|#{window_name}' 2>/dev/null", shellescape(a:socket_path))
     let l:output = system(l:cmd)
     
     if v:shell_error
@@ -757,7 +757,7 @@ function! s:TmuxStartTermAndConnect(tmux_session, socket_path, ...) abort
     let l:window_name = a:0 > 0 ? a:1 : ''
     
     let l:new_session = a:tmux_session . '_NMUXREATTACH_' . s:TmuxRandomUniqueId()
-    let l:cmd = printf("tmux -S '%s' new-session -t '%s' -s '%s'", a:socket_path, a:tmux_session, l:new_session)
+    let l:cmd = printf("tmux -S %s new-session -t %s -s %s", shellescape(a:socket_path), shellescape(a:tmux_session), shellescape(l:new_session))
     execute 'term ' . l:cmd
     
     " Set up buffer-local variables for the reconnected terminal
@@ -849,7 +849,7 @@ function! NeomuxTmuxKillServer() abort
         return
     endif
     
-    let l:cmd = printf("tmux -S '%s' kill-server 2>/dev/null", g:neomux_tmux_socket_file)
+    let l:cmd = printf("tmux -S %s kill-server 2>/dev/null", shellescape(g:neomux_tmux_socket_file))
     call system(l:cmd)
     if v:shell_error
         echom 'neomux: tmux server was not running or already killed'
@@ -866,13 +866,13 @@ function! NeomuxTmuxClean() abort
     endif
     
     let l:socket = g:neomux_tmux_socket_file
-    let l:cmd = printf("tmux -S '%s' ls 2>/dev/null | grep NMUXREATTACH | sed 's/:.*//'", l:socket)
+    let l:cmd = printf("tmux -S %s ls 2>/dev/null | grep NMUXREATTACH | sed 's/:.*//'", shellescape(l:socket))
     let l:output = system(l:cmd)
     
     let l:count = 0
     for l:sess in split(l:output, "\n")
         if !empty(l:sess)
-            let l:kill_cmd = printf("tmux -S '%s' kill-session -t '%s' 2>/dev/null", l:socket, l:sess)
+            let l:kill_cmd = printf("tmux -S %s kill-session -t %s 2>/dev/null", shellescape(l:socket), shellescape(l:sess))
             call system(l:kill_cmd)
             let l:count += 1
         endif
