@@ -571,10 +571,11 @@ function! s:TmuxGenerateWrapper() abort
     let g:neomux_tmux_sess_file = l:session_file
     
     " Write session state file (sourceable vimscript for reconnection)
+    " Use string() to properly escape values for vimscript
     call writefile([
-                \ printf("let g:neomux_tmux_socket_file = '%s'", l:socket_file),
-                \ printf("let g:neomux_tmux_session = '%s'", g:neomux_tmux_session),
-                \ printf("let g:neomux_tmux_sess_file = '%s'", l:session_file)
+                \ printf("let g:neomux_tmux_socket_file = %s", string(l:socket_file)),
+                \ printf("let g:neomux_tmux_session = %s", string(g:neomux_tmux_session)),
+                \ printf("let g:neomux_tmux_sess_file = %s", string(l:session_file))
                 \ ], l:session_file)
     
     " Update tmux environment if server is already running
