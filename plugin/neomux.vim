@@ -721,12 +721,29 @@ function! s:TmuxRandomUniqueId() abort
     return printf('%d.%d', localtime(), rand() % 10000)
 endfunction
 
-function! s:TmuxStartTermAndConnect(tmux_session, socket_path) abort
+function! s:TmuxStartTermAndConnect(tmux_session, socket_path, ...) abort
     " Start a terminal and connect it to an existing tmux session
     " Creates a new tmux session linked to the target session
+    " Optional argument: window_name (if known from tmux query)
+    let l:window_name = a:0 > 0 ? a:1 : ''
+    
     let l:new_session = a:tmux_session . '_NMUXREATTACH_' . s:TmuxRandomUniqueId()
     let l:cmd = printf("tmux -S '%s' new-session -t '%s' -s '%s'", a:socket_path, a:tmux_session, l:new_session)
     execute 'term ' . l:cmd
+    
+    " Set up buffer-local variables for the reconnected terminal
+    let b:neomux_tmux_socket = a:socket_path
+    let b:neomux_tmux_session = a:tmux_session
+    
+    " Restore terminal name from tmux (or use provided name)
+    if empty(l:window_name)
+        let l:window_name = s:TmuxGetWindowName(a:socket_path, a:tmux_session)
+    endif
+    
+    if !empty(l:window_name)
+        let b:neomux_term_name = l:window_name
+        call s:SetNeomuxBufferName(bufnr('%'), l:window_name)
+    endif
 endfunction
 
 function! NeomuxTmuxReconnect(session_name) abort
@@ -757,10 +774,10 @@ function! NeomuxTmuxReconnect(session_name) abort
     let l:socket = g:neomux_tmux_socket_file
     let l:windows = s:TmuxListWindowsForSession(l:socket)
     
-    " Open a split for each tmux session/window
-    for l:sess in keys(l:windows)
+    " Open a split for each tmux session/window, restoring names
+    for [l:sess, l:win_name] in items(l:windows)
         execute 'split'
-        call s:TmuxStartTermAndConnect(l:sess, l:socket)
+        call s:TmuxStartTermAndConnect(l:sess, l:socket, l:win_name)
     endfor
     
     " Provide instructions for updating old shells
