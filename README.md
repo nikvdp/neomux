@@ -349,6 +349,71 @@ Configure neomux by setting any of these variables in your `.vimrc` / `init.vim`
   `g:neomux_start_term_*map` keys are executed. Until the upstream issue is
   fixed, you can work around it by setting `g:neomux_hitenter_fix` to `1`.
 
+### Tmux integration
+
+Neomux can optionally wrap terminals in persistent [tmux][tmux] sessions. This
+allows your shell sessions to survive neovim restarts, and lets you reconnect
+to orphaned sessions from new neovim instances.
+
+To enable tmux integration, add this to your `init.vim`:
+
+```vim
+let g:neomux_enable_tmux = 1
+```
+
+When enabled, `:Neomux` will:
+1. Create a tmux session with a unique name (based on git repo + random word)
+2. Store the tmux socket in `~/.cache/neomux/`
+3. Set up environment variables so shell helpers continue to work
+
+#### Tmux configuration options
+
+- `g:neomux_enable_tmux` - Default: `0`. Set to `1` to enable tmux integration.
+- `g:neomux_tmux_cache_dir` - Default: `~/.cache/neomux`. Directory for tmux
+  sockets and session files.
+- `g:neomux_tmux_session_name` - Default: auto-generated. Override the
+  auto-generated session name.
+
+#### Tmux keybindings (only active when tmux is enabled)
+
+- `g:neomux_tmux_kill_map` - Default: `<Leader>nk`. Kill the tmux server.
+- `g:neomux_tmux_quit_map` - Default: `<Leader>nq`. Kill tmux server and quit vim.
+- `g:neomux_tmux_reconnect_map` - Default: `<Leader>nr`. Open reconnect picker.
+
+#### Tmux commands
+
+- `:NeomuxTmuxKill` - Kill the tmux server for the current session.
+- `:NeomuxTmuxReconnect` - Open a picker to reconnect to orphaned sessions.
+- `:NeomuxTmuxReconnectTo <name>` - Reconnect to a specific session by name.
+- `:NeomuxTmuxClean` - Clean up reattached session markers.
+
+#### Reconnecting to sessions
+
+If neovim exits but your tmux sessions are still running, you can reconnect
+from a new neovim instance:
+
+1. Start neovim and enable tmux mode (`let g:neomux_enable_tmux = 1`)
+2. Press `<Leader>nr` or run `:NeomuxTmuxReconnect`
+3. Select the session to reconnect to from the picker
+
+After reconnecting, old shells need to update their neovim socket reference.
+The reconnect command stores this in the `@n` register:
+
+```bash
+# Run this in old shells to update their connection
+eval $(tmux show-env -g NEOMUX_RC) && source $NEOMUX_RC
+```
+
+#### Tmux public functions
+
+- `NeomuxTmuxSocket()` - Returns the current tmux socket path.
+- `NeomuxTmuxSessionName()` - Returns the current session name.
+- `NeomuxTmuxListSessions()` - Returns a list of active neomux tmux sessions.
+- `NeomuxTmuxKillServer()` - Kills the tmux server.
+- `NeomuxTmuxReconnect(name)` - Reconnects to a session by name.
+- `NeomuxTmuxReconnectPicker()` - Opens the reconnect picker.
+- `NeomuxTmuxClean()` - Cleans up reattached session markers.
+
 ### Miscellanea / troubleshooting
 
 - If you want a simple way to send keys to a neomux terminal session you can do
