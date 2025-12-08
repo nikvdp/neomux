@@ -231,6 +231,10 @@ function! s:NeomuxMain()
     if !exists('g:neomux_tmux_kill_map') | let g:neomux_tmux_kill_map = '<Leader>nk' | endif
     if !exists('g:neomux_tmux_quit_map') | let g:neomux_tmux_quit_map = '<Leader>nq' | endif
     if !exists('g:neomux_tmux_reconnect_map') | let g:neomux_tmux_reconnect_map = '<Leader>nr' | endif
+    
+    " Terminal naming settings (only relevant when tmux is enabled)
+    if !exists('g:neomux_terminal_name_prefix') | let g:neomux_terminal_name_prefix = 'neomux://' | endif
+    if !exists('g:neomux_rename_term_map') | let g:neomux_rename_term_map = '<Leader>nn' | endif
 
     command! Neomux call NeomuxTerm()
     
