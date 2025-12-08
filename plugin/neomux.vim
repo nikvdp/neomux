@@ -842,15 +842,18 @@ function! s:TmuxStartTermAndConnect(socket_path, session, window_id, window_name
     " Create a grouped session linked to the main session, then switch to specific window
     " Using grouped sessions allows each client to have independent window selection
     let l:grouped_session = a:session . '_NMUX_' . s:TmuxRandomUniqueId()
-    " -d creates detached, then we attach separately to allow select-window
-    let l:cmd = printf("tmux -S %s new-session -d -t %s -s %s \\; select-window -t %s:%s \\; attach-session -t %s",
+    " Create grouped session first (detached), then attach
+    let l:create_cmd = printf("tmux -S %s new-session -d -t %s -s %s",
                 \ shellescape(a:socket_path), 
                 \ shellescape(a:session), 
-                \ shellescape(l:grouped_session),
-                \ shellescape(l:grouped_session),
-                \ shellescape(a:window_id),
                 \ shellescape(l:grouped_session))
-    execute 'term ' . l:cmd
+    call system(l:create_cmd)
+    
+    " Now attach to the grouped session with the specific window selected
+    let l:attach_cmd = printf("tmux -S %s attach-session -t %s",
+                \ shellescape(a:socket_path),
+                \ shellescape(l:grouped_session . ':' . a:window_id))
+    execute 'term ' . l:attach_cmd
     
     " Set up buffer-local variables for the reconnected terminal
     let b:neomux_tmux_socket = a:socket_path
