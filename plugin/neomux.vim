@@ -706,11 +706,31 @@ function! s:GenerateDefaultTerminalName() abort
     return l:dir_name
 endfunction
 
+function! s:GetSessionWord() abort
+    " Extract the random word from the session name (e.g., 'neomux_Arum' -> 'Arum')
+    if exists('g:neomux_tmux_session') && !empty(g:neomux_tmux_session)
+        let l:parts = split(g:neomux_tmux_session, '_')
+        if len(l:parts) >= 2
+            return l:parts[-1]
+        endif
+        return g:neomux_tmux_session
+    endif
+    return ''
+endfunction
+
 function! s:SetNeomuxBufferName(bufnr, name) abort
     " Set the neovim buffer name for a neomux terminal
+    " Includes session word for identification: neomux://Arum/term
     " Handles uniqueness by appending <N> suffix if needed
     " Returns a dict with 'base' (the original name) and 'full' (with prefix and possible suffix)
-    let l:fullname = g:neomux_terminal_name_prefix . a:name
+    let l:session_word = s:GetSessionWord()
+    if !empty(l:session_word)
+        let l:display_name = l:session_word . '/' . a:name
+    else
+        let l:display_name = a:name
+    endif
+    
+    let l:fullname = g:neomux_terminal_name_prefix . l:display_name
     let l:final_name = a:name
     
     " Check for existing buffer with same name
