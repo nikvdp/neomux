@@ -725,12 +725,12 @@ function! s:SetNeomuxBufferName(bufnr, name) abort
     " Returns a dict with 'base' (the original name) and 'full' (with prefix and possible suffix)
     let l:session_word = s:GetSessionWord()
     if !empty(l:session_word)
-        let l:display_name = l:session_word . '/' . a:name
+        let l:display_name = l:session_word . ':' . a:name
     else
         let l:display_name = a:name
     endif
     
-    let l:fullname = g:neomux_terminal_name_prefix . l:display_name
+    let l:fullname = 'nmux:' . l:display_name
     let l:final_name = a:name
     
     " Check for existing buffer with same name
