@@ -533,7 +533,9 @@ function! s:TmuxGenerateWrapper() abort
     
     " Derive paths from session name
     let l:socket_file = printf('%s/%s.tmux-socket', g:neomux_tmux_cache_dir, g:neomux_tmux_session)
-    let l:nvim_ident = split(l:nvim_socket, '/')[-1]
+    " Extract nvim identifier from socket path (e.g., /tmp/nvimABC123/0 -> nvimABC123)
+    let l:socket_parts = split(l:nvim_socket, '/')
+    let l:nvim_ident = len(l:socket_parts) >= 2 ? l:socket_parts[-2] : l:socket_parts[-1]
     let l:wrapper_file = printf('%s/%s_%s.sh', g:neomux_tmux_cache_dir, g:neomux_tmux_session, l:nvim_ident)
     let l:session_file = printf('%s/nmux_%s.session', g:neomux_tmux_cache_dir, g:neomux_tmux_session)
     
@@ -660,6 +662,9 @@ function! NeomuxTmuxReconnect(session_name) abort
     if exists('g:neomux_tmux_session')
         unlet g:neomux_tmux_session
     endif
+    if exists('g:neomux_default_shell')
+        unlet g:neomux_default_shell
+    endif
     
     " Set the new session
     let g:neomux_tmux_session = a:session_name
@@ -719,7 +724,11 @@ function! NeomuxTmuxKillServer() abort
     
     let l:cmd = printf("tmux -S '%s' kill-server 2>/dev/null", g:neomux_tmux_socket_file)
     call system(l:cmd)
-    echom 'neomux: Killed tmux server'
+    if v:shell_error
+        echom 'neomux: tmux server was not running or already killed'
+    else
+        echom 'neomux: Killed tmux server'
+    endif
 endfunction
 
 function! NeomuxTmuxClean() abort
