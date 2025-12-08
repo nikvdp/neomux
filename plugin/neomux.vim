@@ -588,13 +588,18 @@ function! s:TmuxGenerateWrapper() abort
     " Determine shell to use
     let l:shell = len($SHELL) > 0 ? $SHELL : '/bin/sh'
     
-    " Write the wrapper script
+    " Write the wrapper script with proper shell escaping
+    " Escape single quotes for shell: ' -> '\''
+    let l:socket_esc = substitute(l:socket_file, "'", "'\\\\''", 'g')
+    let l:shell_esc = substitute(l:shell, "'", "'\\\\''", 'g')
+    let l:nvim_esc = substitute(l:nvim_socket, "'", "'\\\\''", 'g')
+    let l:wrapper_esc = substitute(l:wrapper_file, "'", "'\\\\''", 'g')
     call writefile([
                 \ '#!/bin/bash',
-                \ printf('export NVIM_LISTEN_ADDRESS="%s"', l:nvim_socket),
-                \ printf('export NVIM="%s"', l:nvim_socket),
-                \ printf('export NEOMUX_RC="%s"', l:wrapper_file),
-                \ printf("tmux -S '%s' new-session '%s'", l:socket_file, l:shell)
+                \ printf("export NVIM_LISTEN_ADDRESS='%s'", l:nvim_esc),
+                \ printf("export NVIM='%s'", l:nvim_esc),
+                \ printf("export NEOMUX_RC='%s'", l:wrapper_esc),
+                \ printf("tmux -S '%s' new-session '%s'", l:socket_esc, l:shell_esc)
                 \ ], l:wrapper_file)
     
     call s:SetExecutable(l:wrapper_file)
