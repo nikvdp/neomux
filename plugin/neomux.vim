@@ -922,20 +922,21 @@ function! NeomuxRename(name) abort
         return
     endif
     
-    " Update tmux window name (source of truth)
-    let l:success = s:TmuxSetWindowName(b:neomux_tmux_socket, b:neomux_tmux_session, l:name)
+    " Update neovim buffer name first (may add uniqueness suffix)
+    let l:name_result = s:SetNeomuxBufferName(bufnr('%'), l:name)
+    let l:final_name = l:name_result.final
+    
+    " Update tmux window name (source of truth) with final name
+    let l:success = s:TmuxSetWindowName(b:neomux_tmux_socket, b:neomux_tmux_session, l:final_name)
     if !l:success
         echom 'neomux: Failed to set tmux window name'
         return
     endif
     
-    " Update buffer-local variable
-    let b:neomux_term_name = l:name
+    " Update buffer-local variable with final name
+    let b:neomux_term_name = l:final_name
     
-    " Update neovim buffer name
-    let l:fullname = s:SetNeomuxBufferName(bufnr('%'), l:name)
-    
-    echom printf("neomux: Renamed terminal to '%s'", l:name)
+    echom printf("neomux: Renamed terminal to '%s'", l:final_name)
 endfunction
 
 function! NeomuxRenamePrompt() abort
