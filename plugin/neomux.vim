@@ -224,6 +224,13 @@ function! s:NeomuxMain()
     if !exists('g:neomux_dont_fix_term_ctrlw_map') | let g:neomux_dont_fix_term_ctrlw_map = 0 | endif
     if !exists('g:neomux_no_term_autoinsert') | let g:neomux_no_term_autoinsert = 0 | endif
 
+    " Tmux integration settings (disabled by default)
+    if !exists('g:neomux_enable_tmux') | let g:neomux_enable_tmux = 0 | endif
+    if !exists('g:neomux_tmux_cache_dir') | let g:neomux_tmux_cache_dir = $HOME . '/.cache/neomux' | endif
+    if !exists('g:neomux_tmux_session_name') | let g:neomux_tmux_session_name = '' | endif
+    if !exists('g:neomux_tmux_kill_map') | let g:neomux_tmux_kill_map = '<Leader>nk' | endif
+    if !exists('g:neomux_tmux_quit_map') | let g:neomux_tmux_quit_map = '<Leader>nq' | endif
+    if !exists('g:neomux_tmux_reconnect_map') | let g:neomux_tmux_reconnect_map = '<Leader>nr' | endif
 
     command! Neomux call NeomuxTerm()
 
