@@ -392,16 +392,17 @@ function! NeomuxTerm(...)
         let b:neomux_tmux_socket = g:neomux_tmux_socket_file
         let b:neomux_tmux_session = '0'  " First session in the tmux server
         
-        " Generate and set terminal name
+        " Generate default name and set neovim buffer name (handles uniqueness)
         let l:default_name = s:GenerateDefaultTerminalName()
-        let b:neomux_term_name = l:default_name
+        let l:name_result = s:SetNeomuxBufferName(bufnr('%'), l:default_name)
         
-        " Set neovim buffer name immediately
-        call s:SetNeomuxBufferName(bufnr('%'), l:default_name)
+        " Store the final name (may have uniqueness suffix)
+        let b:neomux_term_name = l:name_result.final
         
         " Set tmux window name with retry (tmux may not be ready immediately)
+        " Use the final name so tmux and neovim stay in sync
         " Retry up to 10 times (1 second total) to handle slow tmux startup
-        call s:TmuxSetWindowNameWithRetry(b:neomux_tmux_socket, b:neomux_tmux_session, l:default_name, 10)
+        call s:TmuxSetWindowNameWithRetry(b:neomux_tmux_socket, b:neomux_tmux_session, l:name_result.final, 10)
     endif
 endfunction
 
@@ -668,7 +669,9 @@ endfunction
 function! s:SetNeomuxBufferName(bufnr, name) abort
     " Set the neovim buffer name for a neomux terminal
     " Handles uniqueness by appending <N> suffix if needed
+    " Returns a dict with 'base' (the original name) and 'full' (with prefix and possible suffix)
     let l:fullname = g:neomux_terminal_name_prefix . a:name
+    let l:final_name = a:name
     
     " Check for existing buffer with same name
     let l:existing = bufnr(l:fullname)
@@ -679,10 +682,11 @@ function! s:SetNeomuxBufferName(bufnr, name) abort
             let l:idx += 1
         endwhile
         let l:fullname = l:fullname . '<' . l:idx . '>'
+        let l:final_name = a:name . '<' . l:idx . '>'
     endif
     
     call nvim_buf_set_name(a:bufnr, l:fullname)
-    return l:fullname
+    return {'base': a:name, 'full': l:fullname, 'final': l:final_name}
 endfunction
 
 function! NeomuxTerminalName(...) abort
@@ -783,8 +787,8 @@ function! s:TmuxStartTermAndConnect(tmux_session, socket_path, ...) abort
     endif
     
     if !empty(l:window_name)
-        let b:neomux_term_name = l:window_name
-        call s:SetNeomuxBufferName(bufnr('%'), l:window_name)
+        let l:name_result = s:SetNeomuxBufferName(bufnr('%'), l:window_name)
+        let b:neomux_term_name = l:name_result.final
     endif
 endfunction
 
