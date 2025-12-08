@@ -243,6 +243,8 @@ function! s:NeomuxMain()
     command! NeomuxTmuxReconnect call NeomuxTmuxReconnectPicker()
     command! NeomuxTmuxClean call NeomuxTmuxClean()
     command! -nargs=1 NeomuxTmuxReconnectTo call NeomuxTmuxReconnect(<q-args>)
+    command! -nargs=1 NeomuxRename call NeomuxRename(<q-args>)
+    command! -nargs=0 NeomuxRenamePrompt call NeomuxRenamePrompt()
 
     call NeomuxAddWinNumLabels()
 
@@ -308,6 +310,7 @@ function! s:NeomuxMain()
         execute printf('noremap %s :call NeomuxTmuxKillServer()<CR>', g:neomux_tmux_kill_map)
         execute printf('noremap %s :call NeomuxTmuxKillServer()<CR>:qa<CR>', g:neomux_tmux_quit_map)
         execute printf('noremap %s :call NeomuxTmuxReconnectPicker()<CR>', g:neomux_tmux_reconnect_map)
+        execute printf('noremap %s :call NeomuxRenamePrompt()<CR>', g:neomux_rename_term_map)
     endif
 endfunction
 
@@ -830,6 +833,52 @@ function! NeomuxTmuxClean() abort
     endfor
     
     echom printf('neomux: Cleaned %d reattached session(s)', l:count)
+endfunction
+
+function! NeomuxRename(name) abort
+    " Rename the current neomux terminal
+    " Updates both tmux window name and neovim buffer name
+    
+    " Check if this is a neomux tmux terminal
+    if !exists('b:neomux_tmux_socket') || !exists('b:neomux_tmux_session')
+        echom 'neomux: Current buffer is not a neomux tmux terminal'
+        return
+    endif
+    
+    let l:name = trim(a:name)
+    if empty(l:name)
+        echom 'neomux: Name cannot be empty'
+        return
+    endif
+    
+    " Update tmux window name (source of truth)
+    let l:success = s:TmuxSetWindowName(b:neomux_tmux_socket, b:neomux_tmux_session, l:name)
+    if !l:success
+        echom 'neomux: Failed to set tmux window name'
+        return
+    endif
+    
+    " Update buffer-local variable
+    let b:neomux_term_name = l:name
+    
+    " Update neovim buffer name
+    let l:fullname = s:SetNeomuxBufferName(bufnr('%'), l:name)
+    
+    echom printf("neomux: Renamed terminal to '%s'", l:name)
+endfunction
+
+function! NeomuxRenamePrompt() abort
+    " Prompt user for a new terminal name
+    if !exists('b:neomux_tmux_socket')
+        echom 'neomux: Current buffer is not a neomux tmux terminal'
+        return
+    endif
+    
+    let l:current = exists('b:neomux_term_name') ? b:neomux_term_name : ''
+    let l:name = input('New terminal name: ', l:current)
+    if !empty(l:name)
+        call NeomuxRename(l:name)
+    endif
 endfunction
 
 function! NeomuxAddWinNumLabels()
