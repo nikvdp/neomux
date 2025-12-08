@@ -218,7 +218,7 @@ function! s:NeomuxMain()
     if !exists('g:neomux_paste_buffer_map') | let g:neomux_paste_buffer_map = '<Leader>bp' | endif
     " Pnemonic: size-fix. Resize terminal window back to proper size
     if !exists('g:neomux_term_sizefix_map') | let g:neomux_term_sizefix_map = '<Leader>sf'  | endif
-    if !exists('g:neomux_win_num_status') | let g:neomux_win_num_status = '∥ W:[%{WindowNumber()}] ∥' | endif
+    if !exists('g:neomux_win_num_status') | let g:neomux_win_num_status = '∥ W:[%{WindowNumber()}]%{NeomuxStatusSession()} ∥' | endif
     if !exists('g:neomux_exit_term_mode_map') | let g:neomux_exit_term_mode_map = '<C-s>' | endif
     if !exists('g:neomux_default_shell') | let g:neomux_default_shell = "" | endif
     if !exists('g:neomux_dont_fix_term_ctrlw_map') | let g:neomux_dont_fix_term_ctrlw_map = 0 | endif
@@ -389,12 +389,13 @@ function! NeomuxTerm(...)
     
     " Set up buffer-local variables and naming for tmux terminals
     if l:is_tmux_term
+        let l:bufnr = bufnr('%')
         let b:neomux_tmux_socket = g:neomux_tmux_socket_file
-        let b:neomux_tmux_session = '0'  " First session in the tmux server
+        let b:neomux_tmux_session = '0'  " Main session in the tmux server
         
         " Generate default name and set neovim buffer name (handles uniqueness)
         let l:default_name = s:GenerateDefaultTerminalName()
-        let l:name_result = s:SetNeomuxBufferName(bufnr('%'), l:default_name)
+        let l:name_result = s:SetNeomuxBufferName(l:bufnr, l:default_name)
         
         " Store the final name (may have uniqueness suffix)
         let b:neomux_term_name = l:name_result.final
@@ -402,12 +403,21 @@ function! NeomuxTerm(...)
         " Set tmux window name with retry (tmux may not be ready immediately)
         " Use the final name so tmux and neovim stay in sync
         " Retry up to 10 times (1 second total) to handle slow tmux startup
-        call s:TmuxSetWindowNameWithRetry(b:neomux_tmux_socket, b:neomux_tmux_session, l:name_result.final, 10)
+        " Also captures and stores the window ID for reconnection
+        call s:TmuxSetWindowNameWithRetry(b:neomux_tmux_socket, b:neomux_tmux_session, l:name_result.final, 10, l:bufnr)
     endif
 endfunction
 
 function! WindowNumber()
     return tabpagewinnr(tabpagenr())
+endfunction
+
+function! NeomuxStatusSession()
+    " Return session name for statusline (only when tmux is enabled)
+    if exists('g:neomux_tmux_session') && !empty(g:neomux_tmux_session)
+        return ' S:[' . g:neomux_tmux_session . ']'
+    endif
+    return ''
 endfunction
 
 function! EnableWinJump(...)
@@ -624,31 +634,38 @@ function! NeomuxTmuxSessionName() abort
     return ''
 endfunction
 
-function! s:TmuxSetWindowName(socket, tmux_session, name) abort
-    " Set the tmux window name for a session
+function! s:TmuxSetWindowName(socket, target, name) abort
+    " Set the tmux window name for a target (session:window or just session for active window)
     " Also disables automatic-rename to prevent tmux from overwriting it
     let l:cmd = printf("tmux -S %s rename-window -t %s %s 2>/dev/null",
-                \ shellescape(a:socket), shellescape(a:tmux_session), shellescape(a:name))
+                \ shellescape(a:socket), shellescape(a:target), shellescape(a:name))
     call system(l:cmd)
     if v:shell_error
         return 0
     endif
     " Disable automatic rename so tmux doesn't overwrite our name
     let l:cmd = printf("tmux -S %s set-window-option -t %s automatic-rename off 2>/dev/null",
-                \ shellescape(a:socket), shellescape(a:tmux_session))
+                \ shellescape(a:socket), shellescape(a:target))
     call system(l:cmd)
     return 1
 endfunction
 
-function! s:TmuxSetWindowNameWithRetry(socket, tmux_session, name, retries) abort
+function! s:TmuxSetWindowNameWithRetry(socket, target, name, retries, bufnr) abort
     " Try to set tmux window name, retrying if tmux isn't ready yet
     " This handles the race condition where neovim starts faster than tmux
-    let l:success = s:TmuxSetWindowName(a:socket, a:tmux_session, a:name)
-    if !l:success && a:retries > 0
+    " Also captures and stores the window ID once successful
+    let l:success = s:TmuxSetWindowName(a:socket, a:target, a:name)
+    if l:success
+        " Get and store the window ID for this buffer
+        let l:window_id = s:TmuxGetActiveWindowId(a:socket, a:target)
+        if !empty(l:window_id) && bufexists(a:bufnr)
+            call setbufvar(a:bufnr, 'neomux_tmux_window', l:window_id)
+        endif
+    elseif a:retries > 0
         " Retry after a short delay (100ms)
-        let l:Callback = {-> s:TmuxSetWindowNameWithRetry(a:socket, a:tmux_session, a:name, a:retries - 1)}
+        let l:Callback = {-> s:TmuxSetWindowNameWithRetry(a:socket, a:target, a:name, a:retries - 1, a:bufnr)}
         call timer_start(100, {_ -> l:Callback()})
-    elseif !l:success && a:retries == 0
+    else
         " All retries exhausted, warn user
         echohl WarningMsg
         echom 'neomux: Failed to set tmux window name after retries (tmux may not have started)'
@@ -657,15 +674,27 @@ function! s:TmuxSetWindowNameWithRetry(socket, tmux_session, name, retries) abor
     return l:success
 endfunction
 
-function! s:TmuxGetWindowName(socket, tmux_session) abort
-    " Get the tmux window name for a session
+function! s:TmuxGetWindowName(socket, target) abort
+    " Get the tmux window name for a target (session or session:window)
     let l:cmd = printf("tmux -S %s display-message -t %s -p '#{window_name}' 2>/dev/null",
-                \ shellescape(a:socket), shellescape(a:tmux_session))
+                \ shellescape(a:socket), shellescape(a:target))
     let l:name = trim(system(l:cmd))
     if v:shell_error
         return ''
     endif
     return l:name
+endfunction
+
+function! s:TmuxGetActiveWindowId(socket, session) abort
+    " Get the window ID of the currently active window in a session
+    " Returns something like @0, @1, etc.
+    let l:cmd = printf("tmux -S %s display-message -t %s -p '#{window_id}' 2>/dev/null",
+                \ shellescape(a:socket), shellescape(a:session))
+    let l:id = trim(system(l:cmd))
+    if v:shell_error
+        return ''
+    endif
+    return l:id
 endfunction
 
 function! s:GenerateDefaultTerminalName() abort
@@ -750,26 +779,27 @@ function! NeomuxTmuxListSessions() abort
     return l:sessions
 endfunction
 
-function! s:TmuxListWindowsForSession(socket_path) abort
-    " List tmux windows/sessions for a given socket
-    " Returns a dict of {session_name: window_name}
+function! s:TmuxListWindowsInSession(socket_path, session) abort
+    " List tmux windows within a specific session
+    " Returns a list of dicts: [{'window_id': '0', 'window_name': 'name'}, ...]
     " Uses ASCII unit separator (0x1f) as delimiter to avoid conflicts with names
     let l:sep = nr2char(31)  " ASCII unit separator
-    let l:cmd = printf("tmux -S %s list-sessions -F '#{session_name}%s#{window_name}' 2>/dev/null", shellescape(a:socket_path), l:sep)
+    let l:cmd = printf("tmux -S %s list-windows -t %s -F '#{window_id}%s#{window_name}' 2>/dev/null", 
+                \ shellescape(a:socket_path), shellescape(a:session), l:sep)
     let l:output = system(l:cmd)
     
     if v:shell_error
-        return {}
+        return []
     endif
     
-    let l:windows = {}
+    let l:windows = []
     for l:line in split(l:output, "\n")
         let l:parts = split(l:line, l:sep, 1)  " keepempty=1 to handle empty names
         if len(l:parts) >= 2
-            " Join remaining parts in case window name somehow contains separator
-            let l:windows[l:parts[0]] = join(l:parts[1:], l:sep)
+            " window_id is like @0, @1, etc.
+            call add(l:windows, {'window_id': l:parts[0], 'window_name': join(l:parts[1:], l:sep)})
         elseif len(l:parts) == 1
-            let l:windows[l:parts[0]] = ''
+            call add(l:windows, {'window_id': l:parts[0], 'window_name': ''})
         endif
     endfor
     
@@ -781,27 +811,34 @@ function! s:TmuxRandomUniqueId() abort
     return printf('%d.%d', localtime(), rand() % 10000)
 endfunction
 
-function! s:TmuxStartTermAndConnect(tmux_session, socket_path, ...) abort
-    " Start a terminal and connect it to an existing tmux session
-    " Creates a new tmux session linked to the target session
-    " Optional argument: window_name (if known from tmux query)
-    let l:window_name = a:0 > 0 ? a:1 : ''
+function! s:TmuxStartTermAndConnect(socket_path, session, window_id, window_name) abort
+    " Start a terminal and attach it to a specific tmux window
+    " Creates a grouped session that shares windows with the target session,
+    " then selects the specific window. This allows each neovim buffer to
+    " show a different tmux window independently.
+    " window_id is like @0, @1, etc. (tmux window unique ID)
     
-    let l:new_session = a:tmux_session . '_NMUXREATTACH_' . s:TmuxRandomUniqueId()
-    let l:cmd = printf("tmux -S %s new-session -t %s -s %s", shellescape(a:socket_path), shellescape(a:tmux_session), shellescape(l:new_session))
+    " Create a grouped session linked to the main session, then switch to specific window
+    " Using grouped sessions allows each client to have independent window selection
+    let l:grouped_session = a:session . '_NMUX_' . s:TmuxRandomUniqueId()
+    " -d creates detached, then we attach separately to allow select-window
+    let l:cmd = printf("tmux -S %s new-session -d -t %s -s %s \\; select-window -t %s:%s \\; attach-session -t %s",
+                \ shellescape(a:socket_path), 
+                \ shellescape(a:session), 
+                \ shellescape(l:grouped_session),
+                \ shellescape(l:grouped_session),
+                \ shellescape(a:window_id),
+                \ shellescape(l:grouped_session))
     execute 'term ' . l:cmd
     
     " Set up buffer-local variables for the reconnected terminal
     let b:neomux_tmux_socket = a:socket_path
-    let b:neomux_tmux_session = a:tmux_session
+    let b:neomux_tmux_session = l:grouped_session
+    let b:neomux_tmux_window = a:window_id
     
-    " Restore terminal name from tmux (or use provided name)
-    if empty(l:window_name)
-        let l:window_name = s:TmuxGetWindowName(a:socket_path, a:tmux_session)
-    endif
-    
-    if !empty(l:window_name)
-        let l:name_result = s:SetNeomuxBufferName(bufnr('%'), l:window_name)
+    " Set buffer name from the provided window name
+    if !empty(a:window_name)
+        let l:name_result = s:SetNeomuxBufferName(bufnr('%'), a:window_name)
         let b:neomux_term_name = l:name_result.final
     endif
 endfunction
@@ -830,14 +867,23 @@ function! NeomuxTmuxReconnect(session_name) abort
     " Regenerate wrapper (this also sets socket_file etc.)
     let l:wrapper = s:TmuxGenerateWrapper()
     
-    " Get socket path and list windows
+    " Get socket path and list windows in the main session (session 0)
     let l:socket = g:neomux_tmux_socket_file
-    let l:windows = s:TmuxListWindowsForSession(l:socket)
+    let l:windows = s:TmuxListWindowsInSession(l:socket, '0')
     
-    " Open a split for each tmux session/window, restoring names
-    for [l:sess, l:win_name] in items(l:windows)
-        execute 'split'
-        call s:TmuxStartTermAndConnect(l:sess, l:socket, l:win_name)
+    if empty(l:windows)
+        echom printf("neomux: No windows found in session '%s'", a:session_name)
+        return
+    endif
+    
+    " Open a split for each tmux window, restoring names
+    let l:first = 1
+    for l:win in l:windows
+        if !l:first
+            execute 'split'
+        endif
+        let l:first = 0
+        call s:TmuxStartTermAndConnect(l:socket, '0', l:win.window_id, l:win.window_name)
     endfor
     
     " Provide instructions for updating old shells
@@ -890,14 +936,14 @@ function! NeomuxTmuxKillServer() abort
 endfunction
 
 function! NeomuxTmuxClean() abort
-    " Clean up reattached session markers (sessions with NMUXREATTACH in name)
+    " Clean up grouped sessions created for reconnection (sessions with _NMUX_ in name)
     if !exists('g:neomux_tmux_socket_file') || empty(g:neomux_tmux_socket_file)
         echom 'neomux: No active tmux session'
         return
     endif
     
     let l:socket = g:neomux_tmux_socket_file
-    let l:cmd = printf("tmux -S %s ls 2>/dev/null | grep NMUXREATTACH | sed 's/:.*//'", shellescape(l:socket))
+    let l:cmd = printf("tmux -S %s ls 2>/dev/null | grep '_NMUX_' | sed 's/:.*//'", shellescape(l:socket))
     let l:output = system(l:cmd)
     
     let l:count = 0
@@ -932,8 +978,14 @@ function! NeomuxRename(name) abort
     let l:name_result = s:SetNeomuxBufferName(bufnr('%'), l:name)
     let l:final_name = l:name_result.final
     
+    " Build target: use window ID if available, otherwise session
+    let l:target = b:neomux_tmux_session
+    if exists('b:neomux_tmux_window') && !empty(b:neomux_tmux_window)
+        let l:target = b:neomux_tmux_session . ':' . b:neomux_tmux_window
+    endif
+    
     " Update tmux window name (source of truth) with final name
-    let l:success = s:TmuxSetWindowName(b:neomux_tmux_socket, b:neomux_tmux_session, l:final_name)
+    let l:success = s:TmuxSetWindowName(b:neomux_tmux_socket, l:target, l:final_name)
     if !l:success
         echom 'neomux: Failed to set tmux window name'
         return
