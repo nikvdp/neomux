@@ -647,6 +647,11 @@ function! s:TmuxSetWindowNameWithRetry(socket, tmux_session, name, retries) abor
         " Retry after a short delay (100ms)
         let l:Callback = {-> s:TmuxSetWindowNameWithRetry(a:socket, a:tmux_session, a:name, a:retries - 1)}
         call timer_start(100, {_ -> l:Callback()})
+    elseif !l:success && a:retries == 0
+        " All retries exhausted, warn user
+        echohl WarningMsg
+        echom 'neomux: Failed to set tmux window name after retries (tmux may not have started)'
+        echohl None
     endif
     return l:success
 endfunction
