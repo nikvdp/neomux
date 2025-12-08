@@ -360,6 +360,7 @@ function! NeomuxTerm(...)
     endif
 
     " If tmux mode is enabled and no explicit command given, use tmux wrapper
+    let l:is_tmux_term = 0
     if g:neomux_enable_tmux && !exists("l:term_cmd")
         " Check if tmux is available
         if !executable('tmux')
@@ -367,6 +368,7 @@ function! NeomuxTerm(...)
             " Fall through to normal terminal
         else
             let l:term_cmd = s:TmuxGenerateWrapper()
+            let l:is_tmux_term = 1
         endif
     endif
 
@@ -380,6 +382,22 @@ function! NeomuxTerm(...)
         else
             term!
         endif
+    endif
+    
+    " Set up buffer-local variables and naming for tmux terminals
+    if l:is_tmux_term
+        let b:neomux_tmux_socket = g:neomux_tmux_socket_file
+        let b:neomux_tmux_session = '0'  " First session in the tmux server
+        
+        " Generate and set terminal name
+        let l:default_name = s:GenerateDefaultTerminalName()
+        let b:neomux_term_name = l:default_name
+        
+        " Set tmux window name (tmux is source of truth)
+        call s:TmuxSetWindowName(b:neomux_tmux_socket, b:neomux_tmux_session, l:default_name)
+        
+        " Set neovim buffer name to match
+        call s:SetNeomuxBufferName(bufnr('%'), l:default_name)
     endif
 endfunction
 
