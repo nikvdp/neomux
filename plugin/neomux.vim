@@ -622,6 +622,35 @@ function! s:TmuxGetWindowName(socket, tmux_session) abort
     return l:name
 endfunction
 
+function! s:GenerateDefaultTerminalName() abort
+    " Generate a default name for a new terminal based on current directory
+    let l:dir_name = fnamemodify(getcwd(), ':t')
+    if empty(l:dir_name)
+        let l:dir_name = 'shell'
+    endif
+    return l:dir_name
+endfunction
+
+function! s:SetNeomuxBufferName(bufnr, name) abort
+    " Set the neovim buffer name for a neomux terminal
+    " Handles uniqueness by appending <N> suffix if needed
+    let l:fullname = g:neomux_terminal_name_prefix . a:name
+    
+    " Check for existing buffer with same name
+    let l:existing = bufnr(l:fullname)
+    if l:existing != -1 && l:existing != a:bufnr
+        " Find unique suffix
+        let l:idx = 2
+        while bufnr(l:fullname . '<' . l:idx . '>') != -1
+            let l:idx += 1
+        endwhile
+        let l:fullname = l:fullname . '<' . l:idx . '>'
+    endif
+    
+    call nvim_buf_set_name(a:bufnr, l:fullname)
+    return l:fullname
+endfunction
+
 function! NeomuxTmuxListSessions() abort
     " List all active neomux tmux sessions by finding open sockets
     " Returns a list of session names
