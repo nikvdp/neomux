@@ -742,7 +742,9 @@ endfunction
 function! s:TmuxListWindowsForSession(socket_path) abort
     " List tmux windows/sessions for a given socket
     " Returns a dict of {session_name: window_name}
-    let l:cmd = printf("tmux -S %s list-sessions -F '#{session_name}|#{window_name}' 2>/dev/null", shellescape(a:socket_path))
+    " Uses ASCII unit separator (0x1f) as delimiter to avoid conflicts with names
+    let l:sep = nr2char(31)  " ASCII unit separator
+    let l:cmd = printf("tmux -S %s list-sessions -F '#{session_name}%s#{window_name}' 2>/dev/null", shellescape(a:socket_path), l:sep)
     let l:output = system(l:cmd)
     
     if v:shell_error
@@ -751,9 +753,10 @@ function! s:TmuxListWindowsForSession(socket_path) abort
     
     let l:windows = {}
     for l:line in split(l:output, "\n")
-        let l:parts = split(l:line, '|')
+        let l:parts = split(l:line, l:sep, 1)  " keepempty=1 to handle empty names
         if len(l:parts) >= 2
-            let l:windows[l:parts[0]] = l:parts[1]
+            " Join remaining parts in case window name somehow contains separator
+            let l:windows[l:parts[0]] = join(l:parts[1:], l:sep)
         elseif len(l:parts) == 1
             let l:windows[l:parts[0]] = ''
         endif
