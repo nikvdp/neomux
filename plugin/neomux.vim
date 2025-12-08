@@ -672,6 +672,35 @@ function! s:SetNeomuxBufferName(bufnr, name) abort
     return l:fullname
 endfunction
 
+function! NeomuxTerminalName(...) abort
+    " Get the terminal name for a neomux buffer
+    " Optional argument: buffer number (defaults to current buffer)
+    let l:bufnr = a:0 > 0 ? a:1 : bufnr('%')
+    
+    " Check if it's a neomux terminal
+    let l:name = getbufvar(l:bufnr, 'neomux_term_name', '')
+    if !empty(l:name)
+        return l:name
+    endif
+    
+    " Try to get from tmux if buffer-local var not set
+    let l:socket = getbufvar(l:bufnr, 'neomux_tmux_socket', '')
+    let l:session = getbufvar(l:bufnr, 'neomux_tmux_session', '')
+    if !empty(l:socket) && !empty(l:session)
+        return s:TmuxGetWindowName(l:socket, l:session)
+    endif
+    
+    return ''
+endfunction
+
+function! NeomuxIsTerminal(...) abort
+    " Check if a buffer is a neomux tmux terminal
+    " Optional argument: buffer number (defaults to current buffer)
+    let l:bufnr = a:0 > 0 ? a:1 : bufnr('%')
+    let l:socket = getbufvar(l:bufnr, 'neomux_tmux_socket', '')
+    return !empty(l:socket)
+endfunction
+
 function! NeomuxTmuxListSessions() abort
     " List all active neomux tmux sessions by finding open sockets
     " Returns a list of session names
