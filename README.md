@@ -379,6 +379,19 @@ When enabled, `:Neomux` will:
 - `g:neomux_tmux_kill_map` - Default: `<Leader>nk`. Kill the tmux server.
 - `g:neomux_tmux_quit_map` - Default: `<Leader>nq`. Kill tmux server and quit vim.
 - `g:neomux_tmux_reconnect_map` - Default: `<Leader>nr`. Open reconnect picker.
+- `g:neomux_rename_term_map` - Default: `<Leader>nn`. Rename current terminal.
+- `g:neomux_terminal_name_prefix` - Default: `neomux://`. Prefix for neovim
+  buffer names.
+
+#### Terminal naming
+
+When tmux integration is enabled, neomux synchronizes terminal names between
+tmux and neovim, with tmux as the source of truth:
+
+- New terminals are automatically named based on the current directory
+- Names are stored in tmux window names and reflected in neovim buffer names
+- Use `:NeomuxRename <name>` or `<Leader>nn` to rename terminals
+- Names are preserved and restored when reconnecting to orphaned sessions
 
 #### Tmux commands
 
@@ -386,6 +399,8 @@ When enabled, `:Neomux` will:
 - `:NeomuxTmuxReconnect` - Open a picker to reconnect to orphaned sessions.
 - `:NeomuxTmuxReconnectTo <name>` - Reconnect to a specific session by name.
 - `:NeomuxTmuxClean` - Clean up reattached session markers.
+- `:NeomuxRename <name>` - Rename the current terminal (syncs tmux and neovim).
+- `:NeomuxRenamePrompt` - Prompt for a new terminal name.
 
 #### Reconnecting to sessions
 
@@ -413,6 +428,9 @@ eval $(tmux show-env -g NEOMUX_RC) && source $NEOMUX_RC
 - `NeomuxTmuxReconnect(name)` - Reconnects to a session by name.
 - `NeomuxTmuxReconnectPicker()` - Opens the reconnect picker.
 - `NeomuxTmuxClean()` - Cleans up reattached session markers.
+- `NeomuxTerminalName([bufnr])` - Returns the terminal name for a buffer.
+- `NeomuxIsTerminal([bufnr])` - Returns true if buffer is a neomux terminal.
+- `NeomuxRename(name)` - Renames the current terminal.
 
 ### Miscellanea / troubleshooting
 
