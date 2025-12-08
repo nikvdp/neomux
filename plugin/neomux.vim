@@ -396,11 +396,12 @@ function! NeomuxTerm(...)
         let l:default_name = s:GenerateDefaultTerminalName()
         let b:neomux_term_name = l:default_name
         
-        " Set tmux window name (tmux is source of truth)
-        call s:TmuxSetWindowName(b:neomux_tmux_socket, b:neomux_tmux_session, l:default_name)
-        
-        " Set neovim buffer name to match
+        " Set neovim buffer name immediately
         call s:SetNeomuxBufferName(bufnr('%'), l:default_name)
+        
+        " Set tmux window name with retry (tmux may not be ready immediately)
+        " Retry up to 10 times (1 second total) to handle slow tmux startup
+        call s:TmuxSetWindowNameWithRetry(b:neomux_tmux_socket, b:neomux_tmux_session, l:default_name, 10)
     endif
 endfunction
 
@@ -630,6 +631,18 @@ function! s:TmuxSetWindowName(socket, tmux_session, name) abort
                 \ shellescape(a:socket), shellescape(a:tmux_session))
     call system(l:cmd)
     return 1
+endfunction
+
+function! s:TmuxSetWindowNameWithRetry(socket, tmux_session, name, retries) abort
+    " Try to set tmux window name, retrying if tmux isn't ready yet
+    " This handles the race condition where neovim starts faster than tmux
+    let l:success = s:TmuxSetWindowName(a:socket, a:tmux_session, a:name)
+    if !l:success && a:retries > 0
+        " Retry after a short delay (100ms)
+        let l:Callback = {-> s:TmuxSetWindowNameWithRetry(a:socket, a:tmux_session, a:name, a:retries - 1)}
+        call timer_start(100, {_ -> l:Callback()})
+    endif
+    return l:success
 endfunction
 
 function! s:TmuxGetWindowName(socket, tmux_session) abort
