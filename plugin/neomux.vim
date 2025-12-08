@@ -233,6 +233,12 @@ function! s:NeomuxMain()
     if !exists('g:neomux_tmux_reconnect_map') | let g:neomux_tmux_reconnect_map = '<Leader>nr' | endif
 
     command! Neomux call NeomuxTerm()
+    
+    " Tmux integration commands (always available, but only useful when tmux enabled)
+    command! NeomuxTmuxKill call NeomuxTmuxKillServer()
+    command! NeomuxTmuxReconnect call NeomuxTmuxReconnectPicker()
+    command! NeomuxTmuxClean call NeomuxTmuxClean()
+    command! -nargs=1 NeomuxTmuxReconnectTo call NeomuxTmuxReconnect(<q-args>)
 
     call NeomuxAddWinNumLabels()
 
@@ -292,6 +298,13 @@ function! s:NeomuxMain()
 
     " term size-fix map
     execute printf('noremap %s <C-\><C-n><Esc>:call NeomuxResizeWindow()<CR>', g:neomux_term_sizefix_map)
+    
+    " Tmux integration keymaps (only set when tmux is enabled)
+    if g:neomux_enable_tmux
+        execute printf('noremap %s :call NeomuxTmuxKillServer()<CR>', g:neomux_tmux_kill_map)
+        execute printf('noremap %s :call NeomuxTmuxKillServer()<CR>:qa<CR>', g:neomux_tmux_quit_map)
+        execute printf('noremap %s :call NeomuxTmuxReconnectPicker()<CR>', g:neomux_tmux_reconnect_map)
+    endif
 endfunction
 
 function! NeomuxSetWinToCurrentPos(tgt_win)
