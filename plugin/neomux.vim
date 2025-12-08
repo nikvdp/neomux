@@ -348,8 +348,22 @@ function! NeomuxResizeWindow()
 endfunction
 
 function! NeomuxTerm(...)
+    " Start a neomux terminal
+    " If g:neomux_enable_tmux is set, wraps the shell in a persistent tmux session
+    
     if a:0 > 0
         let l:term_cmd = a:1
+    endif
+
+    " If tmux mode is enabled and no explicit command given, use tmux wrapper
+    if g:neomux_enable_tmux && !exists("l:term_cmd")
+        " Check if tmux is available
+        if !executable('tmux')
+            call s:WarnOnce('tmux not found in PATH. Install tmux or disable g:neomux_enable_tmux.')
+            " Fall through to normal terminal
+        else
+            let l:term_cmd = s:TmuxGenerateWrapper()
+        endif
     endif
 
     if exists("l:term_cmd")
