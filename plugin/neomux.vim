@@ -595,6 +595,33 @@ function! NeomuxTmuxSessionName() abort
     return ''
 endfunction
 
+function! s:TmuxSetWindowName(socket, tmux_session, name) abort
+    " Set the tmux window name for a session
+    " Also disables automatic-rename to prevent tmux from overwriting it
+    let l:cmd = printf("tmux -S '%s' rename-window -t '%s' '%s' 2>/dev/null",
+                \ a:socket, a:tmux_session, a:name)
+    call system(l:cmd)
+    if v:shell_error
+        return 0
+    endif
+    " Disable automatic rename so tmux doesn't overwrite our name
+    let l:cmd = printf("tmux -S '%s' set-option -t '%s' automatic-rename off 2>/dev/null",
+                \ a:socket, a:tmux_session)
+    call system(l:cmd)
+    return 1
+endfunction
+
+function! s:TmuxGetWindowName(socket, tmux_session) abort
+    " Get the tmux window name for a session
+    let l:cmd = printf("tmux -S '%s' display-message -t '%s' -p '#{window_name}' 2>/dev/null",
+                \ a:socket, a:tmux_session)
+    let l:name = trim(system(l:cmd))
+    if v:shell_error
+        return ''
+    endif
+    return l:name
+endfunction
+
 function! NeomuxTmuxListSessions() abort
     " List all active neomux tmux sessions by finding open sockets
     " Returns a list of session names
