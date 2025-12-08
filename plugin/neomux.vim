@@ -562,6 +562,162 @@ function! NeomuxTmuxSessionName() abort
     return ''
 endfunction
 
+function! NeomuxTmuxListSessions() abort
+    " List all active neomux tmux sessions by finding open sockets
+    " Returns a list of session names
+    let l:sessions = []
+    
+    " Use lsof to find tmux processes with neomux sockets
+    let l:lsof_cmd = printf("lsof -w -P -n -c tmux 2>/dev/null | grep '%s' | grep tmux-socket", g:neomux_tmux_cache_dir)
+    let l:output = system(l:lsof_cmd)
+    
+    " Extract session names from socket paths
+    for l:line in split(l:output, "\n")
+        " Match the session name from path like: /path/to/cache/<session>.tmux-socket
+        let l:match = matchstr(l:line, g:neomux_tmux_cache_dir . '/\zs[^/]\+\ze\.tmux-socket')
+        if !empty(l:match) && index(l:sessions, l:match) < 0
+            call add(l:sessions, l:match)
+        endif
+    endfor
+    
+    return l:sessions
+endfunction
+
+function! s:TmuxListWindowsForSession(socket_path) abort
+    " List tmux windows/sessions for a given socket
+    " Returns a dict of {session_name: window_name}
+    let l:cmd = printf("tmux -S '%s' list-sessions -F '#{session_name}|#{window_name}' 2>/dev/null", a:socket_path)
+    let l:output = system(l:cmd)
+    
+    if v:shell_error
+        return {}
+    endif
+    
+    let l:windows = {}
+    for l:line in split(l:output, "\n")
+        let l:parts = split(l:line, '|')
+        if len(l:parts) >= 2
+            let l:windows[l:parts[0]] = l:parts[1]
+        elseif len(l:parts) == 1
+            let l:windows[l:parts[0]] = ''
+        endif
+    endfor
+    
+    return l:windows
+endfunction
+
+function! s:TmuxRandomUniqueId() abort
+    " Generate a unique ID for reattached sessions
+    return printf('%d.%d', localtime(), rand() % 10000)
+endfunction
+
+function! s:TmuxStartTermAndConnect(tmux_session, socket_path) abort
+    " Start a terminal and connect it to an existing tmux session
+    " Creates a new tmux session linked to the target session
+    let l:new_session = a:tmux_session . '_NMUXREATTACH_' . s:TmuxRandomUniqueId()
+    let l:cmd = printf("tmux -S '%s' new-session -t '%s' -s '%s'", a:socket_path, a:tmux_session, l:new_session)
+    execute 'term ' . l:cmd
+endfunction
+
+function! NeomuxTmuxReconnect(session_name) abort
+    " Reconnect to an existing neomux tmux session
+    " This resets the current session state and opens terminals for each window
+    
+    " Clear existing session state
+    if exists('g:neomux_tmux_sess_file')
+        unlet g:neomux_tmux_sess_file
+    endif
+    if exists('g:neomux_tmux_socket_file')
+        unlet g:neomux_tmux_socket_file
+    endif
+    if exists('g:neomux_tmux_session')
+        unlet g:neomux_tmux_session
+    endif
+    
+    " Set the new session
+    let g:neomux_tmux_session = a:session_name
+    
+    " Regenerate wrapper (this also sets socket_file etc.)
+    let l:wrapper = s:TmuxGenerateWrapper()
+    
+    " Get socket path and list windows
+    let l:socket = g:neomux_tmux_socket_file
+    let l:windows = s:TmuxListWindowsForSession(l:socket)
+    
+    " Open a split for each tmux session/window
+    for l:sess in keys(l:windows)
+        execute 'split'
+        call s:TmuxStartTermAndConnect(l:sess, l:socket)
+    endfor
+    
+    " Provide instructions for updating old shells
+    let l:reload_cmd = 'eval $(tmux show-env -g NEOMUX_RC) && source $NEOMUX_RC'
+    echom printf("Reconnected to '%s'. Run in old shells to update: %s", a:session_name, l:reload_cmd)
+    let @n = l:reload_cmd
+endfunction
+
+function! NeomuxTmuxReconnectPicker() abort
+    " Open fzf picker to select a session to reconnect to
+    let l:sessions = NeomuxTmuxListSessions()
+    
+    if empty(l:sessions)
+        echom 'neomux: No active tmux sessions found'
+        return
+    endif
+    
+    " Check if fzf is available
+    if exists('*fzf#run')
+        call fzf#run({'source': l:sessions, 'sink': function('NeomuxTmuxReconnect')})
+    else
+        " Fallback: show inputlist
+        let l:choices = ['Select session to reconnect:']
+        let l:idx = 1
+        for l:sess in l:sessions
+            call add(l:choices, printf('%d. %s', l:idx, l:sess))
+            let l:idx += 1
+        endfor
+        let l:choice = inputlist(l:choices)
+        if l:choice > 0 && l:choice <= len(l:sessions)
+            call NeomuxTmuxReconnect(l:sessions[l:choice - 1])
+        endif
+    endif
+endfunction
+
+function! NeomuxTmuxKillServer() abort
+    " Kill the tmux server for the current session
+    if !exists('g:neomux_tmux_socket_file') || empty(g:neomux_tmux_socket_file)
+        echom 'neomux: No active tmux session'
+        return
+    endif
+    
+    let l:cmd = printf("tmux -S '%s' kill-server 2>/dev/null", g:neomux_tmux_socket_file)
+    call system(l:cmd)
+    echom 'neomux: Killed tmux server'
+endfunction
+
+function! NeomuxTmuxClean() abort
+    " Clean up reattached session markers (sessions with NMUXREATTACH in name)
+    if !exists('g:neomux_tmux_socket_file') || empty(g:neomux_tmux_socket_file)
+        echom 'neomux: No active tmux session'
+        return
+    endif
+    
+    let l:socket = g:neomux_tmux_socket_file
+    let l:cmd = printf("tmux -S '%s' ls 2>/dev/null | grep NMUXREATTACH | sed 's/:.*//'", l:socket)
+    let l:output = system(l:cmd)
+    
+    let l:count = 0
+    for l:sess in split(l:output, "\n")
+        if !empty(l:sess)
+            let l:kill_cmd = printf("tmux -S '%s' kill-session -t '%s' 2>/dev/null", l:socket, l:sess)
+            call system(l:kill_cmd)
+            let l:count += 1
+        endif
+    endfor
+    
+    echom printf('neomux: Cleaned %d reattached session(s)', l:count)
+endfunction
+
 function! NeomuxAddWinNumLabels()
     " Put window number labels in statusline
 
