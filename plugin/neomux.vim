@@ -828,7 +828,8 @@ endfunction
 
 function! s:TmuxRandomUniqueId() abort
     " Generate a unique ID for reattached sessions
-    return printf('%d.%d', localtime(), rand() % 10000)
+    " Use underscore, not dot (dot is tmux session:window separator)
+    return printf('%d_%d', localtime(), rand() % 10000)
 endfunction
 
 function! s:TmuxStartTermAndConnect(socket_path, session, window_id, window_name) abort
