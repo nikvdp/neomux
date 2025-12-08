@@ -422,6 +422,146 @@ function! NeomuxSendKeys(keys)
     call chansend(b:terminal_job_id, a:keys)
 endfunction
 
+" ============================================================================
+" Tmux Integration Functions
+" ============================================================================
+
+function! s:TmuxRandomWord() abort
+    " Get a random word from the system dictionary for session naming
+    let l:dict_path = '/usr/share/dict/words'
+    if !filereadable(l:dict_path)
+        " Fallback to random number if no dictionary
+        return string(localtime()) . '_' . string(rand() % 10000)
+    endif
+    let l:cmd = printf("sed '%dq;d' %s | sed 's/[^A-Za-z]//g'",
+                \ (rand() % 50000) + 1, l:dict_path)
+    let l:word = trim(system(l:cmd))
+    if empty(l:word)
+        return string(localtime())
+    endif
+    return l:word
+endfunction
+
+function! s:TmuxGetRootDir() abort
+    " Get the git root directory, or current working directory
+    let l:git_root = trim(system('git rev-parse --show-toplevel 2>/dev/null'))
+    if v:shell_error || empty(l:git_root)
+        return getcwd()
+    endif
+    return l:git_root
+endfunction
+
+function! s:TmuxGetNvimSocketPath() abort
+    " Get the neovim socket path for RPC communication
+    " Neovim >= 0.7.2 uses $NVIM, older versions use $NVIM_LISTEN_ADDRESS
+    if has("nvim-0.7.2")
+        return v:servername
+    else
+        return $NVIM_LISTEN_ADDRESS
+    endif
+endfunction
+
+function! s:TmuxEnsureCacheDir() abort
+    " Ensure the cache directory exists
+    if !isdirectory(g:neomux_tmux_cache_dir)
+        call mkdir(g:neomux_tmux_cache_dir, 'p')
+    endif
+endfunction
+
+function! s:TmuxGenerateSessionName() abort
+    " Generate or return the session name
+    if !empty(g:neomux_tmux_session_name)
+        return g:neomux_tmux_session_name
+    endif
+    
+    if exists('g:neomux_tmux_session') && !empty(g:neomux_tmux_session)
+        return g:neomux_tmux_session
+    endif
+    
+    " Generate: <basename_of_root_dir>_<random_word>
+    let l:root_dir = s:TmuxGetRootDir()
+    let l:base_name = fnamemodify(l:root_dir, ':t')
+    let l:random_word = s:TmuxRandomWord()
+    return printf('%s_%s', l:base_name, l:random_word)
+endfunction
+
+function! s:TmuxGenerateWrapper() abort
+    " Generate the tmux wrapper script and return its path
+    " This creates persistent tmux sessions that can survive neovim restarts
+    
+    call s:TmuxEnsureCacheDir()
+    
+    " Set up session name if not already set
+    if !exists('g:neomux_tmux_session') || empty(g:neomux_tmux_session)
+        let g:neomux_tmux_session = s:TmuxGenerateSessionName()
+    endif
+    
+    " Get neovim socket for compatibility with both old and new neovim
+    let l:nvim_socket = s:TmuxGetNvimSocketPath()
+    
+    " Ensure NVIM_LISTEN_ADDRESS is set for older tools
+    if has("nvim-0.7.2")
+        let $NVIM_LISTEN_ADDRESS = v:servername
+    endif
+    
+    " Derive paths from session name
+    let l:socket_file = printf('%s/%s.tmux-socket', g:neomux_tmux_cache_dir, g:neomux_tmux_session)
+    let l:nvim_ident = split(l:nvim_socket, '/')[-1]
+    let l:wrapper_file = printf('%s/%s_%s.sh', g:neomux_tmux_cache_dir, g:neomux_tmux_session, l:nvim_ident)
+    let l:session_file = printf('%s/nmux_%s.session', g:neomux_tmux_cache_dir, g:neomux_tmux_session)
+    
+    " Store paths in global variables for access by other functions
+    let g:neomux_tmux_socket_file = l:socket_file
+    let g:neomux_tmux_sess_file = l:session_file
+    
+    " Write session state file (sourceable vimscript for reconnection)
+    call writefile([
+                \ printf("let g:neomux_tmux_socket_file = '%s'", l:socket_file),
+                \ printf("let g:neomux_tmux_session = '%s'", g:neomux_tmux_session),
+                \ printf("let g:neomux_tmux_sess_file = '%s'", l:session_file)
+                \ ], l:session_file)
+    
+    " Update tmux environment if server is already running
+    call system(printf("tmux -S '%s' set-environment -g NVIM '%s' 2>/dev/null", l:socket_file, l:nvim_socket))
+    call system(printf("tmux -S '%s' set-environment -g NVIM_LISTEN_ADDRESS '%s' 2>/dev/null", l:socket_file, l:nvim_socket))
+    call system(printf("tmux -S '%s' set-environment -g NEOMUX_RC '%s' 2>/dev/null", l:socket_file, l:wrapper_file))
+    
+    " Set environment variable for shell access
+    let $NEOMUX_RC = l:wrapper_file
+    
+    " Determine shell to use
+    let l:shell = len($SHELL) > 0 ? $SHELL : '/bin/sh'
+    
+    " Write the wrapper script
+    call writefile([
+                \ '#!/bin/bash',
+                \ printf('export NVIM_LISTEN_ADDRESS="%s"', l:nvim_socket),
+                \ printf('export NVIM="%s"', l:nvim_socket),
+                \ printf('export NEOMUX_RC="%s"', l:wrapper_file),
+                \ printf("tmux -S '%s' new-session '%s'", l:socket_file, l:shell)
+                \ ], l:wrapper_file)
+    
+    call s:SetExecutable(l:wrapper_file)
+    
+    return l:wrapper_file
+endfunction
+
+function! NeomuxTmuxSocket() abort
+    " Public function to get the current tmux socket path
+    if exists('g:neomux_tmux_socket_file')
+        return g:neomux_tmux_socket_file
+    endif
+    return ''
+endfunction
+
+function! NeomuxTmuxSessionName() abort
+    " Public function to get the current session name
+    if exists('g:neomux_tmux_session')
+        return g:neomux_tmux_session
+    endif
+    return ''
+endfunction
+
 function! NeomuxAddWinNumLabels()
     " Put window number labels in statusline
 
