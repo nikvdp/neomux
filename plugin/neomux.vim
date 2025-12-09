@@ -1092,50 +1092,84 @@ function! s:CaptureWindowState(winid) abort
     return l:state
 endfunction
 
-function! s:CollectWindowStatesInOrder(layout, states_list) abort
-    " Walk layout tree depth-first, collecting window states in order
-    " This ensures save and restore use the same ordering
+function! s:SerializeLayoutTree(layout, states, active_winid, meta) abort
+    " Convert raw winlayout() data into a stable dictionary tree
     let l:type = a:layout[0]
     
     if l:type ==# 'leaf'
-        " Leaf node - capture this window's state
         let l:winid = a:layout[1]
-        call add(a:states_list, s:CaptureWindowState(l:winid))
-        return
+        call add(a:states, s:CaptureWindowState(l:winid))
+        let l:index = len(a:states) - 1
+        if l:winid == a:active_winid
+            let a:meta.active = l:index
+        endif
+        return {'type': 'leaf', 'state_index': l:index}
     endif
     
-    " It's a split - recurse into children
+    let l:children = []
     for l:child in a:layout[1]
-        call s:CollectWindowStatesInOrder(l:child, a:states_list)
+        call add(l:children, s:SerializeLayoutTree(l:child, a:states, a:active_winid, a:meta))
     endfor
+    
+    return {'type': l:type, 'children': l:children}
+endfunction
+
+function! s:ConvertLegacyLayout(node, cursor) abort
+    " Convert the legacy list-based layout into the new dictionary shape
+    let l:type = a:node[0]
+    
+    if l:type ==# 'leaf'
+        let l:index = a:cursor.next
+        if a:cursor.limit > 0 && l:index >= a:cursor.limit
+            let l:index = a:cursor.limit - 1
+        endif
+        let a:cursor.next += 1
+        return {'type': 'leaf', 'state_index': max([0, l:index])}
+    endif
+    
+    let l:children = []
+    for l:child in a:node[1]
+        call add(l:children, s:ConvertLegacyLayout(l:child, a:cursor))
+    endfor
+    
+    return {'type': l:type, 'children': l:children}
+endfunction
+
+function! s:EnsureLayoutTree(layout, state_count) abort
+    " Ensure layout data uses the dictionary schema, converting if needed
+    if type(a:layout) == type({})
+        if get(a:layout, 'type', '') ==# 'leaf' && !has_key(a:layout, 'state_index')
+            let a:layout.state_index = 0
+        endif
+        return a:layout
+    endif
+    
+    if type(a:layout) != type([])
+        return {'type': 'leaf', 'state_index': 0}
+    endif
+    
+    let l:cursor = {'next': 0, 'limit': a:state_count}
+    return s:ConvertLegacyLayout(a:layout, l:cursor)
 endfunction
 
 function! s:CaptureTabState(tabnr) abort
     " Capture the state of a single tab, including window layout
-    " Need to switch to the tab to capture winrestcmd() correctly
-    let l:current_tab = tabpagenr()
+    let l:return_winid = win_getid()
     execute 'tabnext ' . a:tabnr
     
-    " Get the winlayout for this tab (nested structure of splits)
-    let l:layout = winlayout(a:tabnr)
-    
-    " Capture resize commands - this is the key to correct sizing
-    let l:resize_cmd = winrestcmd()
-    
-    " Collect window states in depth-first order matching the layout
     let l:states = []
-    call s:CollectWindowStatesInOrder(l:layout, l:states)
+    let l:meta = {'active': 0}
+    let l:layout = s:SerializeLayoutTree(winlayout(a:tabnr), l:states, win_getid(), l:meta)
     
-    " Switch back to original tab
-    execute 'tabnext ' . l:current_tab
+    call win_gotoid(l:return_winid)
     
-    return {'layout': l:layout, 'states': l:states, 'resize_cmd': l:resize_cmd}
+    return {'layout': l:layout, 'states': l:states, 'active': l:meta.active}
 endfunction
 
 function! s:CaptureSessionState() abort
     " Capture the entire session state
     let l:state = {
-        \ 'version': 1,
+        \ 'version': 2,
         \ 'neomux_session': exists('g:neomux_tmux_session') ? g:neomux_tmux_session : '',
         \ 'cwd': getcwd(),
         \ 'current_tab': tabpagenr(),
@@ -1150,62 +1184,90 @@ function! s:CaptureSessionState() abort
     return l:state
 endfunction
 
-function! s:CreateSplitStructure(layout, winids_list) abort
-    " Pass 1: Recursively create the split structure (no content yet)
-    " Appends window IDs to winids_list in depth-first order
-    " Returns the anchor winid (first leaf window in this subtree)
-    let l:type = a:layout[0]
-    
-    if l:type ==# 'leaf'
-        " Leaf node - record current window and return it as anchor
-        let l:winid = win_getid()
-        call add(a:winids_list, l:winid)
-        return l:winid
+function! s:CreateSplitStructure(layout, leaves) abort
+    " Recursively create the split structure to mirror the saved layout tree
+    if empty(a:layout)
+        return 0
     endif
     
-    " It's a split (row or col)
-    let l:children = a:layout[1]
-    " row = horizontal arrangement (left to right), need vsplit
-    " col = vertical arrangement (top to bottom), need split
-    let l:split_cmd = l:type ==# 'row' ? 'rightbelow vnew' : 'belowright new'
+    return s:BuildLayoutNode(a:layout, win_getid(), a:leaves)
+endfunction
+
+function! s:BuildLayoutNode(node, winid, leaves) abort
+    let l:type = get(a:node, 'type', 'leaf')
+    if l:type ==# 'leaf'
+        call win_gotoid(a:winid)
+        call add(a:leaves, {'winid': a:winid, 'state_index': get(a:node, 'state_index', len(a:leaves))})
+        return a:winid
+    endif
     
-    " First child uses current window - this becomes our anchor
-    let l:anchor_winid = s:CreateSplitStructure(l:children[0], a:winids_list)
+    let l:children = get(a:node, 'children', [])
+    if empty(l:children)
+        return s:BuildLayoutNode({'type': 'leaf', 'state_index': get(a:node, 'state_index', len(a:leaves))}, a:winid, a:leaves)
+    endif
     
-    " Create new windows for remaining children
-    " CRITICAL: Return to anchor window before each split so splits happen
-    " at the correct hierarchical level
-    for l:i in range(1, len(l:children) - 1)
-        call win_gotoid(l:anchor_winid)
-        execute l:split_cmd
-        call s:CreateSplitStructure(l:children[l:i], a:winids_list)
+    let l:placeholders = s:EnsureChildWindows(a:winid, l:type, len(l:children))
+    for l:idx in range(0, len(l:children) - 1)
+        call s:BuildLayoutNode(l:children[l:idx], l:placeholders[l:idx], a:leaves)
     endfor
     
-    " Return anchor so parent can split relative to it
-    return l:anchor_winid
+    call win_gotoid(l:placeholders[0])
+    return l:placeholders[0]
+endfunction
+
+function! s:EnsureChildWindows(anchor_winid, layout_type, count) abort
+    " Split anchor_winid into count placeholder windows laid out like layout_type
+    if a:count <= 1
+        return [a:anchor_winid]
+    endif
+    
+    let l:windows = [a:anchor_winid]
+    let l:current = a:anchor_winid
+    let l:cmd = a:layout_type ==# 'row' ? 'rightbelow vsplit' : 'belowright split'
+    
+    for l:i in range(2, a:count)
+        call win_gotoid(l:current)
+        execute l:cmd
+        let l:current = win_getid()
+        call add(l:windows, l:current)
+    endfor
+    
+    " Ensure the list is exactly count long
+    return l:windows
 endfunction
 
 function! s:RestoreTabLayout(tabstate) abort
-    " Restore a tab's layout using two-pass approach:
-    " Pass 1: Create split structure
-    " Pass 2: Load content into each window
-    " Pass 3: Apply saved resize commands
+    " Restore a tab's layout using the saved split tree and window states
+    if !has_key(a:tabstate, 'layout')
+        return
+    endif
     
-    " Pass 1: Create the split structure, collect window IDs in order
-    let l:winids = []
-    call s:CreateSplitStructure(a:tabstate.layout, l:winids)
+    let l:states = get(a:tabstate, 'states', [])
+    let l:layout = s:EnsureLayoutTree(a:tabstate.layout, len(l:states))
+    let l:leaves = []
+    call s:CreateSplitStructure(l:layout, l:leaves)
     
-    " Pass 2: Load content into each window (in same depth-first order)
-    for l:i in range(len(l:winids))
-        if l:i < len(a:tabstate.states)
-            call win_gotoid(l:winids[l:i])
-            call s:RestoreWindowContent(a:tabstate.states[l:i])
+    for l:leaf in l:leaves
+        let l:index = get(l:leaf, 'state_index', -1)
+        if l:index >= 0 && l:index < len(l:states)
+            call win_gotoid(l:leaf.winid)
+            call s:RestoreWindowContent(l:states[l:index])
+        else
+            call win_gotoid(l:leaf.winid)
+            enew
         endif
     endfor
     
-    " Pass 3: Apply saved resize commands to fix window sizes
-    if has_key(a:tabstate, 'resize_cmd') && !empty(a:tabstate.resize_cmd)
-        execute a:tabstate.resize_cmd
+    let l:target = get(a:tabstate, 'active', 0)
+    for l:leaf in l:leaves
+        if get(l:leaf, 'state_index', -1) == l:target
+            call win_gotoid(l:leaf.winid)
+            return
+        endif
+    endfor
+    
+    if !empty(l:leaves)
+        call win_gotoid(l:leaves[0].winid)
     endif
 endfunction
 
@@ -1252,6 +1314,10 @@ function! s:RestoreSessionState(state) abort
     " Close all existing windows/tabs first
     silent! tabonly
     silent! only
+    
+    if !has_key(a:state, 'tabs') || empty(a:state.tabs)
+        return
+    endif
     
     " Restore each tab
     let l:first_tab = 1
