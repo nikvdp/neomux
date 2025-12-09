@@ -801,9 +801,8 @@ endfunction
 
 function! s:TmuxListWindowsInSession(socket_path, session) abort
     " List tmux windows within a specific session
-    " Returns a list of dicts: [{'window_id': '0', 'window_name': 'name'}, ...]
-    " Uses ASCII unit separator (0x1f) as delimiter to avoid conflicts with names
-    let l:sep = nr2char(31)  " ASCII unit separator
+    " Returns a list of dicts: [{'window_id': '@0', 'window_name': 'name'}, ...]
+    let l:sep = '|||'
     let l:cmd = printf("tmux -S %s list-windows -t %s -F '#{window_id}%s#{window_name}' 2>/dev/null", 
                 \ shellescape(a:socket_path), shellescape(a:session), l:sep)
     let l:output = system(l:cmd)
