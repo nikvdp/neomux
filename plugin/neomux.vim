@@ -1145,7 +1145,11 @@ function! s:RestoreLayout(layout, states_list, index) abort
     " layout is from winlayout(): ['leaf', winid] or ['row'/'col', [children]]
     " states_list is the ordered list of window states
     " index is the current position in states_list (passed by reference via list)
-    " Returns the number of leaves processed
+    "
+    " winlayout returns:
+    "   'row' = windows arranged horizontally (left to right)
+    "   'col' = windows arranged vertically (top to bottom)
+    " Children are listed in order: left-to-right for row, top-to-bottom for col
     
     let l:type = a:layout[0]
     
@@ -1160,7 +1164,10 @@ function! s:RestoreLayout(layout, states_list, index) abort
     
     " It's a split (row or col)
     let l:children = a:layout[1]
-    let l:split_cmd = l:type ==# 'row' ? 'vsplit' : 'split'
+    " row = horizontal arrangement, need vsplit; col = vertical, need split
+    " Use 'rightbelow' for row (new window to right) and 'below' for col (new window below)
+    " This ensures children appear in correct order: left-to-right or top-to-bottom
+    let l:split_cmd = l:type ==# 'row' ? 'rightbelow vsplit' : 'belowright split'
     
     " Restore first child in current window
     call s:RestoreLayout(l:children[0], a:states_list, a:index)
