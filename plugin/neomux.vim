@@ -1150,14 +1150,17 @@ function! s:CaptureSessionState() abort
     return l:state
 endfunction
 
-function! s:CreateSplitStructure(layout) abort
+function! s:CreateSplitStructure(layout, winids_list) abort
     " Pass 1: Recursively create the split structure (no content yet)
-    " Returns list of window IDs in depth-first order
+    " Appends window IDs to winids_list in depth-first order
+    " Returns the anchor winid (first leaf window in this subtree)
     let l:type = a:layout[0]
     
     if l:type ==# 'leaf'
-        " Leaf node - return current window
-        return [win_getid()]
+        " Leaf node - record current window and return it as anchor
+        let l:winid = win_getid()
+        call add(a:winids_list, l:winid)
+        return l:winid
     endif
     
     " It's a split (row or col)
@@ -1166,18 +1169,20 @@ function! s:CreateSplitStructure(layout) abort
     " col = vertical arrangement (top to bottom), need split
     let l:split_cmd = l:type ==# 'row' ? 'rightbelow vnew' : 'belowright new'
     
-    let l:winids = []
-    
-    " First child uses current window
-    let l:winids += s:CreateSplitStructure(l:children[0])
+    " First child uses current window - this becomes our anchor
+    let l:anchor_winid = s:CreateSplitStructure(l:children[0], a:winids_list)
     
     " Create new windows for remaining children
+    " CRITICAL: Return to anchor window before each split so splits happen
+    " at the correct hierarchical level
     for l:i in range(1, len(l:children) - 1)
+        call win_gotoid(l:anchor_winid)
         execute l:split_cmd
-        let l:winids += s:CreateSplitStructure(l:children[l:i])
+        call s:CreateSplitStructure(l:children[l:i], a:winids_list)
     endfor
     
-    return l:winids
+    " Return anchor so parent can split relative to it
+    return l:anchor_winid
 endfunction
 
 function! s:RestoreTabLayout(tabstate) abort
@@ -1186,8 +1191,9 @@ function! s:RestoreTabLayout(tabstate) abort
     " Pass 2: Load content into each window
     " Pass 3: Apply saved resize commands
     
-    " Pass 1: Create the split structure, get window IDs in order
-    let l:winids = s:CreateSplitStructure(a:tabstate.layout)
+    " Pass 1: Create the split structure, collect window IDs in order
+    let l:winids = []
+    call s:CreateSplitStructure(a:tabstate.layout, l:winids)
     
     " Pass 2: Load content into each window (in same depth-first order)
     for l:i in range(len(l:winids))
