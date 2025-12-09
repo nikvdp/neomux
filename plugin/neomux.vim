@@ -247,8 +247,8 @@ function! s:NeomuxMain()
     command! -nargs=0 NeomuxRenamePrompt call NeomuxRenamePrompt()
     
     " Session save/restore commands
-    command! -nargs=? -complete=file NeomuxSaveSession call NeomuxSaveSession(<f-args>)
-    command! -nargs=? -complete=file NeomuxRestoreSession call NeomuxRestoreSession(<f-args>)
+    command! -nargs=0 NeomuxSaveSession call NeomuxSaveSession()
+    command! -nargs=? NeomuxRestoreSession call NeomuxRestoreSession(<f-args>)
 
     call NeomuxAddWinNumLabels()
 
@@ -1026,12 +1026,31 @@ endfunction
 " Session Save/Restore Functions
 " ============================================================================
 
-function! s:GetSessionFilePath() abort
-    " Get the path for the session file (stored alongside tmux socket)
-    if !exists('g:neomux_tmux_session') || empty(g:neomux_tmux_session)
+function! s:TmuxSaveSessionState(socket, json) abort
+    " Save session state to tmux environment variable
+    let l:cmd = printf("tmux -S %s set-environment -g NEOMUX_SESSION_STATE %s 2>/dev/null",
+                \ shellescape(a:socket), shellescape(a:json))
+    call system(l:cmd)
+    return !v:shell_error
+endfunction
+
+function! s:TmuxLoadSessionState(socket) abort
+    " Load session state from tmux environment variable
+    let l:cmd = printf("tmux -S %s show-environment -g NEOMUX_SESSION_STATE 2>/dev/null",
+                \ shellescape(a:socket))
+    let l:output = trim(system(l:cmd))
+    
+    if v:shell_error || empty(l:output)
         return ''
     endif
-    return printf('%s/%s.session.json', g:neomux_tmux_cache_dir, g:neomux_tmux_session)
+    
+    " Output is "NEOMUX_SESSION_STATE=<json>", extract the value
+    let l:idx = stridx(l:output, '=')
+    if l:idx < 0
+        return ''
+    endif
+    
+    return l:output[l:idx + 1:]
 endfunction
 
 function! s:CaptureWindowState(winid) abort
@@ -1201,13 +1220,10 @@ function! s:RestoreSessionState(state) abort
     endif
 endfunction
 
-function! NeomuxSaveSession(...) abort
-    " Save the current session state
-    " Optional argument: file path (defaults to session file in cache dir)
+function! NeomuxSaveSession() abort
+    " Save the current session state to tmux
     
-    let l:filepath = a:0 > 0 ? a:1 : s:GetSessionFilePath()
-    
-    if empty(l:filepath)
+    if !exists('g:neomux_tmux_socket_file') || empty(g:neomux_tmux_socket_file)
         echom 'neomux: No active neomux session. Start a terminal first.'
         return
     endif
@@ -1215,30 +1231,34 @@ function! NeomuxSaveSession(...) abort
     let l:state = s:CaptureSessionState()
     let l:json = json_encode(l:state)
     
-    call writefile([l:json], l:filepath)
-    echom printf('neomux: Session saved to %s', l:filepath)
+    let l:success = s:TmuxSaveSessionState(g:neomux_tmux_socket_file, l:json)
+    if l:success
+        echom 'neomux: Session saved to tmux'
+    else
+        echom 'neomux: Failed to save session to tmux'
+    endif
 endfunction
 
 function! NeomuxRestoreSession(...) abort
-    " Restore a saved session state
-    " Optional argument: file path (defaults to session file in cache dir)
+    " Restore a saved session state from tmux
+    " Optional argument: session name (defaults to picker if multiple)
     
-    let l:filepath = ''
+    let l:session_name = ''
     
     if a:0 > 0
-        " Path provided as argument
-        let l:filepath = a:1
+        " Session name provided as argument
+        let l:session_name = a:1
     else
-        " Try to find session file - need to pick from available sessions
+        " Pick from available sessions
         let l:sessions = NeomuxTmuxListSessions()
         if empty(l:sessions)
-            echom 'neomux: No saved sessions found'
+            echom 'neomux: No active tmux sessions found'
             return
         endif
         
         " If only one session, use it
         if len(l:sessions) == 1
-            let l:filepath = printf('%s/%s.session.json', g:neomux_tmux_cache_dir, l:sessions[0])
+            let l:session_name = l:sessions[0]
         else
             " Multiple sessions - use fzf or inputlist
             if exists('*fzf#run')
@@ -1253,7 +1273,7 @@ function! NeomuxRestoreSession(...) abort
                 endfor
                 let l:choice = inputlist(l:choices)
                 if l:choice > 0 && l:choice <= len(l:sessions)
-                    let l:filepath = printf('%s/%s.session.json', g:neomux_tmux_cache_dir, l:sessions[l:choice - 1])
+                    let l:session_name = l:sessions[l:choice - 1]
                 else
                     return
                 endif
@@ -1261,22 +1281,26 @@ function! NeomuxRestoreSession(...) abort
         endif
     endif
     
-    if !filereadable(l:filepath)
-        echom printf('neomux: Session file not found: %s', l:filepath)
+    " Build socket path from session name
+    let l:socket = printf('%s/%s.tmux-socket', g:neomux_tmux_cache_dir, l:session_name)
+    
+    " Load state from tmux
+    let l:json = s:TmuxLoadSessionState(l:socket)
+    if empty(l:json)
+        " No saved state - fall back to just reconnecting terminals
+        echom 'neomux: No saved layout, reconnecting terminals only'
+        call NeomuxTmuxReconnect(l:session_name)
         return
     endif
     
-    let l:json = join(readfile(l:filepath), '')
     let l:state = json_decode(l:json)
-    
     call s:RestoreSessionState(l:state)
-    echom printf('neomux: Session restored from %s', l:filepath)
+    echom printf('neomux: Session restored from tmux (%s)', l:session_name)
 endfunction
 
 function! s:RestoreSessionByName(session_name) abort
     " Helper for fzf callback
-    let l:filepath = printf('%s/%s.session.json', g:neomux_tmux_cache_dir, a:session_name)
-    call NeomuxRestoreSession(l:filepath)
+    call NeomuxRestoreSession(a:session_name)
 endfunction
 
 
