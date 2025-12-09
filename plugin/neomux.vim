@@ -245,6 +245,10 @@ function! s:NeomuxMain()
     command! -nargs=1 NeomuxTmuxReconnectTo call NeomuxTmuxReconnect(<q-args>)
     command! -nargs=1 NeomuxRename call NeomuxRename(<q-args>)
     command! -nargs=0 NeomuxRenamePrompt call NeomuxRenamePrompt()
+    
+    " Session save/restore commands
+    command! -nargs=? -complete=file NeomuxSaveSession call NeomuxSaveSession(<f-args>)
+    command! -nargs=? -complete=file NeomuxRestoreSession call NeomuxRestoreSession(<f-args>)
 
     call NeomuxAddWinNumLabels()
 
@@ -1016,6 +1020,263 @@ function! NeomuxAddWinNumLabels()
         endif
     endif
 
+endfunction
+
+" ============================================================================
+" Session Save/Restore Functions
+" ============================================================================
+
+function! s:GetSessionFilePath() abort
+    " Get the path for the session file (stored alongside tmux socket)
+    if !exists('g:neomux_tmux_session') || empty(g:neomux_tmux_session)
+        return ''
+    endif
+    return printf('%s/%s.session.json', g:neomux_tmux_cache_dir, g:neomux_tmux_session)
+endfunction
+
+function! s:CaptureWindowState(winid) abort
+    " Capture the state of a single window
+    let l:bufnr = winbufnr(a:winid)
+    let l:buftype = getbufvar(l:bufnr, '&buftype')
+    let l:bufname = bufname(l:bufnr)
+    
+    let l:state = {}
+    
+    if l:buftype ==# 'terminal'
+        " It's a terminal - check if it's a neomux terminal
+        let l:tmux_session = getbufvar(l:bufnr, 'neomux_tmux_session', '')
+        let l:term_name = getbufvar(l:bufnr, 'neomux_term_name', '')
+        
+        if !empty(l:tmux_session)
+            let l:state.type = 'neomux_terminal'
+            let l:state.tmux_session = l:tmux_session
+            let l:state.name = l:term_name
+        else
+            " Regular terminal (not neomux) - we can't restore these
+            let l:state.type = 'terminal'
+            let l:state.name = l:bufname
+        endif
+    elseif empty(l:buftype) && !empty(l:bufname) && filereadable(l:bufname)
+        " Regular file buffer
+        let l:state.type = 'file'
+        let l:state.path = fnamemodify(l:bufname, ':p')
+        " Save cursor position
+        let l:pos = getcurpos(a:winid)
+        let l:state.cursor = [l:pos[1], l:pos[2]]
+    else
+        " Other buffer types (help, quickfix, empty, etc.)
+        let l:state.type = 'other'
+        let l:state.buftype = l:buftype
+        let l:state.bufname = l:bufname
+    endif
+    
+    return l:state
+endfunction
+
+function! s:CaptureTabState(tabnr) abort
+    " Capture the state of a single tab, including window layout
+    let l:tabstate = {'windows': []}
+    
+    " Get the winlayout for this tab (nested structure of splits)
+    let l:tabstate.layout = winlayout(a:tabnr)
+    
+    " Get all windows in this tab and their states
+    " We need to map window IDs to their states
+    let l:tabstate.window_states = {}
+    for l:winid in gettabinfo(a:tabnr)[0].windows
+        let l:tabstate.window_states[l:winid] = s:CaptureWindowState(l:winid)
+    endfor
+    
+    return l:tabstate
+endfunction
+
+function! s:CaptureSessionState() abort
+    " Capture the entire session state
+    let l:state = {
+        \ 'version': 1,
+        \ 'neomux_session': exists('g:neomux_tmux_session') ? g:neomux_tmux_session : '',
+        \ 'cwd': getcwd(),
+        \ 'current_tab': tabpagenr(),
+        \ 'tabs': []
+        \ }
+    
+    " Capture each tab
+    for l:tabnr in range(1, tabpagenr('$'))
+        call add(l:state.tabs, s:CaptureTabState(l:tabnr))
+    endfor
+    
+    return l:state
+endfunction
+
+function! s:RestoreLayout(layout, window_states, is_first) abort
+    " Recursively restore a window layout
+    " layout is from winlayout(): ['leaf', winid] or ['row'/'col', [children]]
+    
+    let l:type = a:layout[0]
+    
+    if l:type ==# 'leaf'
+        " This is a leaf window - restore its content
+        let l:orig_winid = a:layout[1]
+        let l:state = get(a:window_states, string(l:orig_winid), {})
+        
+        if !empty(l:state)
+            call s:RestoreWindowContent(l:state)
+        endif
+        return
+    endif
+    
+    " It's a split (row or col)
+    let l:children = a:layout[1]
+    let l:split_cmd = l:type ==# 'row' ? 'vsplit' : 'split'
+    
+    " Restore first child in current window
+    call s:RestoreLayout(l:children[0], a:window_states, 1)
+    
+    " Create splits for remaining children
+    for l:i in range(1, len(l:children) - 1)
+        execute l:split_cmd
+        call s:RestoreLayout(l:children[l:i], a:window_states, 0)
+    endfor
+endfunction
+
+function! s:RestoreWindowContent(state) abort
+    " Restore the content of a window based on saved state
+    
+    if a:state.type ==# 'file'
+        " Open the file
+        if filereadable(a:state.path)
+            execute 'edit ' . fnameescape(a:state.path)
+            " Restore cursor position
+            if has_key(a:state, 'cursor')
+                call cursor(a:state.cursor[0], a:state.cursor[1])
+            endif
+        endif
+    elseif a:state.type ==# 'neomux_terminal'
+        " Reconnect to the tmux session
+        if !empty(a:state.tmux_session)
+            call s:TmuxStartTermAndConnect(g:neomux_tmux_socket_file, a:state.tmux_session, a:state.name)
+        endif
+    elseif a:state.type ==# 'terminal'
+        " Regular terminal - just create an empty one (can't restore state)
+        terminal
+    else
+        " Other buffer types - create empty buffer
+        enew
+    endif
+endfunction
+
+function! s:RestoreSessionState(state) abort
+    " Restore the entire session state
+    
+    " Set up neomux session variables
+    if !empty(a:state.neomux_session)
+        let g:neomux_tmux_session = a:state.neomux_session
+        let g:neomux_tmux_socket_file = printf('%s/%s.tmux-socket', g:neomux_tmux_cache_dir, a:state.neomux_session)
+    endif
+    
+    " Change to saved working directory
+    if !empty(a:state.cwd) && isdirectory(a:state.cwd)
+        execute 'cd ' . fnameescape(a:state.cwd)
+    endif
+    
+    " Close all existing windows/tabs first
+    silent! tabonly
+    silent! only
+    
+    " Restore each tab
+    let l:first_tab = 1
+    for l:tabstate in a:state.tabs
+        if !l:first_tab
+            tabnew
+        endif
+        let l:first_tab = 0
+        
+        " Restore the layout for this tab
+        call s:RestoreLayout(l:tabstate.layout, l:tabstate.window_states, 1)
+    endfor
+    
+    " Switch to the originally active tab
+    if has_key(a:state, 'current_tab') && a:state.current_tab > 0
+        execute 'tabnext ' . a:state.current_tab
+    endif
+endfunction
+
+function! NeomuxSaveSession(...) abort
+    " Save the current session state
+    " Optional argument: file path (defaults to session file in cache dir)
+    
+    let l:filepath = a:0 > 0 ? a:1 : s:GetSessionFilePath()
+    
+    if empty(l:filepath)
+        echom 'neomux: No active neomux session. Start a terminal first.'
+        return
+    endif
+    
+    let l:state = s:CaptureSessionState()
+    let l:json = json_encode(l:state)
+    
+    call writefile([l:json], l:filepath)
+    echom printf('neomux: Session saved to %s', l:filepath)
+endfunction
+
+function! NeomuxRestoreSession(...) abort
+    " Restore a saved session state
+    " Optional argument: file path (defaults to session file in cache dir)
+    
+    let l:filepath = ''
+    
+    if a:0 > 0
+        " Path provided as argument
+        let l:filepath = a:1
+    else
+        " Try to find session file - need to pick from available sessions
+        let l:sessions = NeomuxTmuxListSessions()
+        if empty(l:sessions)
+            echom 'neomux: No saved sessions found'
+            return
+        endif
+        
+        " If only one session, use it
+        if len(l:sessions) == 1
+            let l:filepath = printf('%s/%s.session.json', g:neomux_tmux_cache_dir, l:sessions[0])
+        else
+            " Multiple sessions - use fzf or inputlist
+            if exists('*fzf#run')
+                call fzf#run({'source': l:sessions, 'sink': function('s:RestoreSessionByName')})
+                return
+            else
+                let l:choices = ['Select session to restore:']
+                let l:idx = 1
+                for l:sess in l:sessions
+                    call add(l:choices, printf('%d. %s', l:idx, l:sess))
+                    let l:idx += 1
+                endfor
+                let l:choice = inputlist(l:choices)
+                if l:choice > 0 && l:choice <= len(l:sessions)
+                    let l:filepath = printf('%s/%s.session.json', g:neomux_tmux_cache_dir, l:sessions[l:choice - 1])
+                else
+                    return
+                endif
+            endif
+        endif
+    endif
+    
+    if !filereadable(l:filepath)
+        echom printf('neomux: Session file not found: %s', l:filepath)
+        return
+    endif
+    
+    let l:json = join(readfile(l:filepath), '')
+    let l:state = json_decode(l:json)
+    
+    call s:RestoreSessionState(l:state)
+    echom printf('neomux: Session restored from %s', l:filepath)
+endfunction
+
+function! s:RestoreSessionByName(session_name) abort
+    " Helper for fzf callback
+    let l:filepath = printf('%s/%s.session.json', g:neomux_tmux_cache_dir, a:session_name)
+    call NeomuxRestoreSession(l:filepath)
 endfunction
 
 
