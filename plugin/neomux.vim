@@ -1092,21 +1092,34 @@ function! s:CaptureWindowState(winid) abort
     return l:state
 endfunction
 
+function! s:CollectWindowStatesInOrder(layout, states_list) abort
+    " Walk layout tree depth-first, collecting window states in order
+    " This ensures save and restore use the same ordering
+    let l:type = a:layout[0]
+    
+    if l:type ==# 'leaf'
+        " Leaf node - capture this window's state
+        let l:winid = a:layout[1]
+        call add(a:states_list, s:CaptureWindowState(l:winid))
+        return
+    endif
+    
+    " It's a split - recurse into children
+    for l:child in a:layout[1]
+        call s:CollectWindowStatesInOrder(l:child, a:states_list)
+    endfor
+endfunction
+
 function! s:CaptureTabState(tabnr) abort
     " Capture the state of a single tab, including window layout
-    let l:tabstate = {'windows': []}
-    
     " Get the winlayout for this tab (nested structure of splits)
-    let l:tabstate.layout = winlayout(a:tabnr)
+    let l:layout = winlayout(a:tabnr)
     
-    " Get all windows in this tab and their states
-    " We need to map window IDs to their states
-    let l:tabstate.window_states = {}
-    for l:winid in gettabinfo(a:tabnr)[0].windows
-        let l:tabstate.window_states[l:winid] = s:CaptureWindowState(l:winid)
-    endfor
+    " Collect window states in depth-first order matching the layout
+    let l:states = []
+    call s:CollectWindowStatesInOrder(l:layout, l:states)
     
-    return l:tabstate
+    return {'layout': l:layout, 'states': l:states}
 endfunction
 
 function! s:CaptureSessionState() abort
@@ -1127,19 +1140,20 @@ function! s:CaptureSessionState() abort
     return l:state
 endfunction
 
-function! s:RestoreLayout(layout, window_states, is_first) abort
+function! s:RestoreLayout(layout, states_list, index) abort
     " Recursively restore a window layout
     " layout is from winlayout(): ['leaf', winid] or ['row'/'col', [children]]
+    " states_list is the ordered list of window states
+    " index is the current position in states_list (passed by reference via list)
+    " Returns the number of leaves processed
     
     let l:type = a:layout[0]
     
     if l:type ==# 'leaf'
-        " This is a leaf window - restore its content
-        let l:orig_winid = a:layout[1]
-        let l:state = get(a:window_states, string(l:orig_winid), {})
-        
-        if !empty(l:state)
-            call s:RestoreWindowContent(l:state)
+        " This is a leaf window - restore its content from the ordered list
+        if a:index[0] < len(a:states_list)
+            call s:RestoreWindowContent(a:states_list[a:index[0]])
+            let a:index[0] += 1
         endif
         return
     endif
@@ -1149,12 +1163,12 @@ function! s:RestoreLayout(layout, window_states, is_first) abort
     let l:split_cmd = l:type ==# 'row' ? 'vsplit' : 'split'
     
     " Restore first child in current window
-    call s:RestoreLayout(l:children[0], a:window_states, 1)
+    call s:RestoreLayout(l:children[0], a:states_list, a:index)
     
     " Create splits for remaining children
     for l:i in range(1, len(l:children) - 1)
         execute l:split_cmd
-        call s:RestoreLayout(l:children[l:i], a:window_states, 0)
+        call s:RestoreLayout(l:children[l:i], a:states_list, a:index)
     endfor
 endfunction
 
@@ -1211,7 +1225,9 @@ function! s:RestoreSessionState(state) abort
         let l:first_tab = 0
         
         " Restore the layout for this tab
-        call s:RestoreLayout(l:tabstate.layout, l:tabstate.window_states, 1)
+        " Use a list [index] to pass index by reference
+        let l:index = [0]
+        call s:RestoreLayout(l:tabstate.layout, l:tabstate.states, l:index)
     endfor
     
     " Switch to the originally active tab
