@@ -1112,14 +1112,24 @@ endfunction
 
 function! s:CaptureTabState(tabnr) abort
     " Capture the state of a single tab, including window layout
+    " Need to switch to the tab to capture winrestcmd() correctly
+    let l:current_tab = tabpagenr()
+    execute 'tabnext ' . a:tabnr
+    
     " Get the winlayout for this tab (nested structure of splits)
     let l:layout = winlayout(a:tabnr)
+    
+    " Capture resize commands - this is the key to correct sizing
+    let l:resize_cmd = winrestcmd()
     
     " Collect window states in depth-first order matching the layout
     let l:states = []
     call s:CollectWindowStatesInOrder(l:layout, l:states)
     
-    return {'layout': l:layout, 'states': l:states}
+    " Switch back to original tab
+    execute 'tabnext ' . l:current_tab
+    
+    return {'layout': l:layout, 'states': l:states, 'resize_cmd': l:resize_cmd}
 endfunction
 
 function! s:CaptureSessionState() abort
@@ -1140,43 +1150,57 @@ function! s:CaptureSessionState() abort
     return l:state
 endfunction
 
-function! s:RestoreLayout(layout, states_list, index) abort
-    " Recursively restore a window layout
-    " layout is from winlayout(): ['leaf', winid] or ['row'/'col', [children]]
-    " states_list is the ordered list of window states
-    " index is the current position in states_list (passed by reference via list)
-    "
-    " winlayout returns:
-    "   'row' = windows arranged horizontally (left to right)
-    "   'col' = windows arranged vertically (top to bottom)
-    " Children are listed in order: left-to-right for row, top-to-bottom for col
-    
+function! s:CreateSplitStructure(layout) abort
+    " Pass 1: Recursively create the split structure (no content yet)
+    " Returns list of window IDs in depth-first order
     let l:type = a:layout[0]
     
     if l:type ==# 'leaf'
-        " This is a leaf window - restore its content from the ordered list
-        if a:index[0] < len(a:states_list)
-            call s:RestoreWindowContent(a:states_list[a:index[0]])
-            let a:index[0] += 1
-        endif
-        return
+        " Leaf node - return current window
+        return [win_getid()]
     endif
     
     " It's a split (row or col)
     let l:children = a:layout[1]
-    " row = horizontal arrangement, need vsplit; col = vertical, need split
-    " Use 'rightbelow' for row (new window to right) and 'below' for col (new window below)
-    " This ensures children appear in correct order: left-to-right or top-to-bottom
-    let l:split_cmd = l:type ==# 'row' ? 'rightbelow vsplit' : 'belowright split'
+    " row = horizontal arrangement (left to right), need vsplit
+    " col = vertical arrangement (top to bottom), need split
+    let l:split_cmd = l:type ==# 'row' ? 'rightbelow vnew' : 'belowright new'
     
-    " Restore first child in current window
-    call s:RestoreLayout(l:children[0], a:states_list, a:index)
+    let l:winids = []
     
-    " Create splits for remaining children
+    " First child uses current window
+    let l:winids += s:CreateSplitStructure(l:children[0])
+    
+    " Create new windows for remaining children
     for l:i in range(1, len(l:children) - 1)
         execute l:split_cmd
-        call s:RestoreLayout(l:children[l:i], a:states_list, a:index)
+        let l:winids += s:CreateSplitStructure(l:children[l:i])
     endfor
+    
+    return l:winids
+endfunction
+
+function! s:RestoreTabLayout(tabstate) abort
+    " Restore a tab's layout using two-pass approach:
+    " Pass 1: Create split structure
+    " Pass 2: Load content into each window
+    " Pass 3: Apply saved resize commands
+    
+    " Pass 1: Create the split structure, get window IDs in order
+    let l:winids = s:CreateSplitStructure(a:tabstate.layout)
+    
+    " Pass 2: Load content into each window (in same depth-first order)
+    for l:i in range(len(l:winids))
+        if l:i < len(a:tabstate.states)
+            call win_gotoid(l:winids[l:i])
+            call s:RestoreWindowContent(a:tabstate.states[l:i])
+        endif
+    endfor
+    
+    " Pass 3: Apply saved resize commands to fix window sizes
+    if has_key(a:tabstate, 'resize_cmd') && !empty(a:tabstate.resize_cmd)
+        execute a:tabstate.resize_cmd
+    endif
 endfunction
 
 function! s:RestoreWindowContent(state) abort
@@ -1231,10 +1255,8 @@ function! s:RestoreSessionState(state) abort
         endif
         let l:first_tab = 0
         
-        " Restore the layout for this tab
-        " Use a list [index] to pass index by reference
-        let l:index = [0]
-        call s:RestoreLayout(l:tabstate.layout, l:tabstate.states, l:index)
+        " Restore the layout for this tab using two-pass approach
+        call s:RestoreTabLayout(l:tabstate)
     endfor
     
     " Switch to the originally active tab
