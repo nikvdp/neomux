@@ -583,9 +583,30 @@ function! s:TmuxEnsureSessionVars() abort
         let $NVIM_LISTEN_ADDRESS = v:servername
     endif
     
+    " Create/update the RC script that shells can source
+    let l:rc_file = printf('%s/%s.rc.sh', g:neomux_tmux_cache_dir, g:neomux_tmux_session)
+    call s:WriteNeomuxRc(l:rc_file, l:nvim_socket)
+    
+    " Set NEOMUX_RC in our environment so it propagates to tmux
+    let $NEOMUX_RC = l:rc_file
+    
     " Update tmux environment if server is already running
     call system(printf("tmux -S %s set-environment -g NVIM %s 2>/dev/null", shellescape(l:socket_file), shellescape(l:nvim_socket)))
     call system(printf("tmux -S %s set-environment -g NVIM_LISTEN_ADDRESS %s 2>/dev/null", shellescape(l:socket_file), shellescape(l:nvim_socket)))
+    call system(printf("tmux -S %s set-environment -g NEOMUX_RC %s 2>/dev/null", shellescape(l:socket_file), shellescape(l:rc_file)))
+endfunction
+
+function! s:WriteNeomuxRc(rc_file, nvim_socket) abort
+    " Write the RC script that shells source on startup
+    " This ensures PATH includes neomux bin folder and env vars are set
+    let l:lines = [
+        \ '# Neomux RC - source this in your shell for neomux integration',
+        \ printf('export PATH="%s:$PATH"', s:bin_folder),
+        \ printf('export NVIM="%s"', a:nvim_socket),
+        \ printf('export NVIM_LISTEN_ADDRESS="%s"', a:nvim_socket),
+        \ printf('export EDITOR="%s/nmux"', s:bin_folder),
+        \ ]
+    call writefile(l:lines, a:rc_file)
 endfunction
 
 function! s:TmuxGetNextSessionNum(socket) abort
