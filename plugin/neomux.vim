@@ -880,6 +880,11 @@ function! NeomuxTmuxReconnect(session_name) abort
     let l:socket = printf('%s/%s.tmux-socket', g:neomux_tmux_cache_dir, a:session_name)
     let g:neomux_tmux_socket_file = l:socket
     
+    " Update tmux environment with new neovim socket so old shells can find us
+    let l:nvim_socket = s:TmuxGetNvimSocketPath()
+    call system(printf("tmux -S %s set-environment -g NVIM %s 2>/dev/null", shellescape(l:socket), shellescape(l:nvim_socket)))
+    call system(printf("tmux -S %s set-environment -g NVIM_LISTEN_ADDRESS %s 2>/dev/null", shellescape(l:socket), shellescape(l:nvim_socket)))
+    
     " List all main sessions (nmux_0, nmux_1, etc.)
     let l:sessions = s:TmuxListMainSessions(l:socket)
     
