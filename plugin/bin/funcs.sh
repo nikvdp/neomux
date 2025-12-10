@@ -14,7 +14,9 @@ get_nvim_socket() {
 
 nvr_cmd() {
     # Wrapper for nvr that gets fresh socket from tmux if available
-    NVIM=$(get_nvim_socket) nvr "$@"
+    export NVIM="$(get_nvim_socket)"
+    export NVIM_LISTEN_ADDRESS="$NVIM"
+    nvr "$@"
 }
 
 e() {
