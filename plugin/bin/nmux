@@ -1,2 +1,4 @@
 #!/usr/bin/env bash
-exec nvr -cc vsplit --remote-wait "$@"
+SCRIPT_LOCATION="$( cd "$( dirname "$0" )" && pwd )"
+source "$SCRIPT_LOCATION/funcs.sh"
+exec nvr_cmd -cc vsplit --remote-wait "$@"

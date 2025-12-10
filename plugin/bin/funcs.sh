@@ -1,39 +1,58 @@
+get_nvim_socket() {
+    # Get nvim socket - from tmux if available (survives reconnect), else env var
+    if [ -n "$TMUX" ]; then
+        local socket
+        socket=$(tmux show-environment -g NVIM 2>/dev/null | cut -d= -f2)
+        if [ -n "$socket" ]; then
+            echo "$socket"
+            return
+        fi
+    fi
+    # Fallback to env var
+    echo "${NVIM:-$NVIM_LISTEN_ADDRESS}"
+}
+
+nvr_cmd() {
+    # Wrapper for nvr that gets fresh socket from tmux if available
+    NVIM=$(get_nvim_socket) nvr "$@"
+}
+
 e() {
-    # split
-    nvr --remote "$@"
+    # edit in current window
+    nvr_cmd --remote "$@"
 }
 
 s() {
     # split
-    nvr --remote -o "$@"
+    nvr_cmd --remote -o "$@"
 }
 
 vs() {
     # vert split
-    nvr --remote -O "$@"
+    nvr_cmd --remote -O "$@"
 }
 
 t() {
     # tab
-    nvr --remote-tab "$@"
+    nvr_cmd --remote-tab "$@"
 }
 
 vbcopy() {
     local register=${1:-@""}
     local inp
     inp="$(</dev/stdin)"
-    nvr -c "let @$register=\"$(echo "$inp" | sed -E 's/(["\])/\\\1/g')\""
+    nvr_cmd -c "let @$register=\"$(echo "$inp" | sed -E 's/(["\])/\\\1/g')\""
 }
 
 vbpaste() {
     local register="${1:-@\"}"
-    nvr --remote-expr "@$register"
+    nvr_cmd --remote-expr "@$register"
 }
 
 vcd() {
     # switch *neovim's* working dir to $1
     local dir="$(abspath "${1:-$PWD}")"
-    nvr -c "chdir $dir"
+    nvr_cmd -c "chdir $dir"
 }
 
 cdv() {
@@ -43,15 +62,15 @@ cdv() {
 
 vpwd() {
   # print vim's current working dir (-1,-1) tells vim to return the global working dir
-    nvr --remote-expr "getcwd(-1,-1)"
+    nvr_cmd --remote-expr "getcwd(-1,-1)"
 }
 
 vim-window-print() {
     # vim-window-print: send contents of a window out to stdout
     local win="$1"
-    local oldwin="$(nvr --remote-expr 'tabpagewinnr(tabpagenr())')"
-    nvr -cc "${win}wincmd w" --remote-expr 'join(getline(1,"$"), "\n")' -c "${oldwin}wincmd w"
-    # nvr --remote-send a
+    local oldwin="$(nvr_cmd --remote-expr 'tabpagewinnr(tabpagenr())')"
+    nvr_cmd -cc "${win}wincmd w" --remote-expr 'join(getline(1,"$"), "\n")' -c "${oldwin}wincmd w"
+    # nvr_cmd --remote-send a
 }
 
 # (vw from the command line) -- open a file in the window with the specified number
@@ -61,9 +80,9 @@ vimwindow() {
     local file="$2"
     if [[ "$file" == "-" ]]; then
         # allow piping stdin if '-' passed as filename
-        cat | nvr -cc "${win}wincmd w" --remote -
+        cat | nvr_cmd -cc "${win}wincmd w" --remote -
     else
-        nvr -cc "${win}wincmd w" -c "e $(abspath "$file")"
+        nvr_cmd -cc "${win}wincmd w" -c "e $(abspath "$file")"
     fi
 }
 
@@ -73,7 +92,7 @@ vimwindowsplit() {
     # remote nvim open file $2 in window $1
     local win="$1"
     local file="$2"
-    nvr -cc "${win}wincmd w" -c "split"
+    nvr_cmd -cc "${win}wincmd w" -c "split"
     vimwindow "$win" "$file"
 }
 
