@@ -67,7 +67,9 @@ function! s:DetectPlatform() abort
 endfunction
 
 function! s:ComposeAssetName(tag, platform) abort
-    return printf('nvr-go_%s_%s_%s.tar.gz', a:tag, a:platform.asset_os, a:platform.asset_arch)
+    " Strip 'v' prefix from tag (e.g., v0.0.4 -> 0.0.4) to match goreleaser's {{ .Version }}
+    let l:version = substitute(a:tag, '^v', '', '')
+    return printf('nvr-go_%s_%s_%s.tar.gz', l:version, a:platform.asset_os, a:platform.asset_arch)
 endfunction
 
 function! s:LocalNvrPath() abort
