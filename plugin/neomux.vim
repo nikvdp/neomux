@@ -560,6 +560,23 @@ function! s:TmuxGenerateSessionName() abort
     return printf('%s_%s', l:base_name, l:random_word)
 endfunction
 
+function! s:TmuxUpdateEnvironment(socket) abort
+    " Update tmux global environment with current neovim socket
+    " This allows shells to find the new neovim instance after reconnect/restore
+    let l:nvim_socket = s:TmuxGetNvimSocketPath()
+    
+    " Update tmux environment variables
+    call system(printf("tmux -S %s set-environment -g NVIM %s 2>/dev/null", shellescape(a:socket), shellescape(l:nvim_socket)))
+    call system(printf("tmux -S %s set-environment -g NVIM_LISTEN_ADDRESS %s 2>/dev/null", shellescape(a:socket), shellescape(l:nvim_socket)))
+    
+    " Also update/create the RC file so shells can source it
+    let l:rc_file = printf('%s/%s.rc.sh', g:neomux_tmux_cache_dir, g:neomux_tmux_session)
+    call s:WriteNeomuxRc(l:rc_file, l:nvim_socket)
+    call system(printf("tmux -S %s set-environment -g NEOMUX_RC %s 2>/dev/null", shellescape(a:socket), shellescape(l:rc_file)))
+    
+    return l:rc_file
+endfunction
+
 function! s:TmuxEnsureSessionVars() abort
     " Ensure global session variables are set up
     " Call this before any tmux operations
@@ -575,25 +592,16 @@ function! s:TmuxEnsureSessionVars() abort
     let l:socket_file = printf('%s/%s.tmux-socket', g:neomux_tmux_cache_dir, g:neomux_tmux_session)
     let g:neomux_tmux_socket_file = l:socket_file
     
-    " Get neovim socket for compatibility with both old and new neovim
-    let l:nvim_socket = s:TmuxGetNvimSocketPath()
-    
     " Ensure NVIM_LISTEN_ADDRESS is set for older tools
     if has("nvim-0.7.2")
         let $NVIM_LISTEN_ADDRESS = v:servername
     endif
     
-    " Create/update the RC script that shells can source
-    let l:rc_file = printf('%s/%s.rc.sh', g:neomux_tmux_cache_dir, g:neomux_tmux_session)
-    call s:WriteNeomuxRc(l:rc_file, l:nvim_socket)
+    " Update tmux environment and get the RC file path
+    let l:rc_file = s:TmuxUpdateEnvironment(l:socket_file)
     
     " Set NEOMUX_RC in our environment so it propagates to tmux
     let $NEOMUX_RC = l:rc_file
-    
-    " Update tmux environment if server is already running
-    call system(printf("tmux -S %s set-environment -g NVIM %s 2>/dev/null", shellescape(l:socket_file), shellescape(l:nvim_socket)))
-    call system(printf("tmux -S %s set-environment -g NVIM_LISTEN_ADDRESS %s 2>/dev/null", shellescape(l:socket_file), shellescape(l:nvim_socket)))
-    call system(printf("tmux -S %s set-environment -g NEOMUX_RC %s 2>/dev/null", shellescape(l:socket_file), shellescape(l:rc_file)))
 endfunction
 
 function! s:WriteNeomuxRc(rc_file, nvim_socket) abort
@@ -881,9 +889,7 @@ function! NeomuxTmuxReconnect(session_name) abort
     let g:neomux_tmux_socket_file = l:socket
     
     " Update tmux environment with new neovim socket so old shells can find us
-    let l:nvim_socket = s:TmuxGetNvimSocketPath()
-    call system(printf("tmux -S %s set-environment -g NVIM %s 2>/dev/null", shellescape(l:socket), shellescape(l:nvim_socket)))
-    call system(printf("tmux -S %s set-environment -g NVIM_LISTEN_ADDRESS %s 2>/dev/null", shellescape(l:socket), shellescape(l:nvim_socket)))
+    call s:TmuxUpdateEnvironment(l:socket)
     
     " List all main sessions (nmux_0, nmux_1, etc.)
     let l:sessions = s:TmuxListMainSessions(l:socket)
@@ -1330,6 +1336,9 @@ function! s:RestoreSessionState(state) abort
     if !empty(a:state.neomux_session)
         let g:neomux_tmux_session = a:state.neomux_session
         let g:neomux_tmux_socket_file = printf('%s/%s.tmux-socket', g:neomux_tmux_cache_dir, a:state.neomux_session)
+        
+        " Update tmux environment with new neovim socket so restored shells can find us
+        call s:TmuxUpdateEnvironment(g:neomux_tmux_socket_file)
     endif
     
     " Change to saved working directory
