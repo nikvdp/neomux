@@ -388,11 +388,18 @@ That's it! Now `:Neomux` creates persistent terminals.
 
 1. **Start terminals**: `:Neomux` works the same, but terminals now persist
 2. **Name your session** (optional): `:NeomuxRenameSession myproject`
-3. **Save layout** (optional): `:NeomuxSaveSession` (auto-saves every 30s anyway)
+3. **Work normally**: Auto-save runs every 30s, saving your layout
 4. **Close neovim**: Your shells keep running in tmux
-5. **Reconnect later**: Start neovim, run `:NeomuxTmuxReconnect`, pick your session
+5. **Restore later**: Start neovim, run `:NeomuxRestoreSession`, pick your session
 
-Your terminal layout, names, and command history all restore automatically.
+Your window splits, terminal names, and command history all come back exactly as
+you left them.
+
+**Restore vs Reconnect:**
+- **`:NeomuxRestoreSession`** - Restores your saved window layout (splits, positions)
+  AND reconnects terminals. Use this 99% of the time - it brings back everything.
+- **`:NeomuxTmuxReconnect`** - Only reconnects terminals, doesn't restore layout.
+  Use this if you just want the running shells without recreating splits.
 
 #### Tmux configuration options
 
@@ -426,16 +433,21 @@ tmux and neovim, with tmux as the source of truth:
 
 #### Tmux commands
 
-- `:NeomuxTmuxKill` - Kill the tmux server for the current session.
-- `:NeomuxTmuxReconnect` - Open a picker to reconnect to orphaned sessions.
-- `:NeomuxTmuxReconnectTo <name>` - Reconnect to a specific session by name.
-- `:NeomuxTmuxClean` - Clean up reattached session markers.
-- `:NeomuxRenameTerminal <name>` - Rename the current terminal.
-- `:NeomuxRenameTerminalPrompt` - Prompt for a new terminal name.
-- `:NeomuxRenameSession <name>` - Rename the current session (display name).
-- `:NeomuxRenameSessionPrompt` - Prompt for a new session name.
-- `:NeomuxSaveSession` - Manually save current session state to tmux.
-- `:NeomuxRestoreSession [name]` - Restore a saved session (opens picker if no name given).
+**Session management (what you use most):**
+- `:NeomuxRestoreSession [name]` - Restore saved session with layout (use this after restart)
+- `:NeomuxSaveSession` - Manually save session (auto-saves every 30s anyway)
+- `:NeomuxRenameSession <name>` - Give session a memorable name
+- `:NeomuxRenameSessionPrompt` - Prompt for session name
+
+**Terminal management:**
+- `:NeomuxRenameTerminal <name>` - Rename current terminal
+- `:NeomuxRenameTerminalPrompt` - Prompt for terminal name
+
+**Advanced/less common:**
+- `:NeomuxTmuxReconnect` - Reconnect terminals without restoring layout
+- `:NeomuxTmuxReconnectTo <name>` - Reconnect to specific session by name
+- `:NeomuxTmuxKill` - Kill the tmux server for current session
+- `:NeomuxTmuxClean` - Clean up orphaned session markers
 
 #### Common workflows
 
@@ -457,19 +469,31 @@ Terminal names show in buffer names and are preserved across reconnects.
 ```
 Though auto-save runs every 30s, you can force a save before risky operations.
 
-**Reconnect to crashed/closed session:**
+**Restore your session after closing neovim:**
 ```vim
-:NeomuxTmuxReconnect           " Pick from list (or press <Leader>nr)
-:NeomuxRestoreSession          " Same thing - saves + reconnects
+:NeomuxRestoreSession          " Pick from list - restores layout + terminals
 ```
-Sessions are sorted by most recent first.
 
-#### Reconnecting after neovim crashes
+**Or just reconnect terminals without layout:**
+```vim
+:NeomuxTmuxReconnect           " Press <Leader>nr - terminals only
+```
 
-If neovim crashes, your shells keep running but lose connection to neovim. When
-you reconnect via `:NeomuxTmuxReconnect`, old shell sessions automatically get
-updated to point to the new neovim instance. Just restart neovim and reconnect -
-everything works immediately.
+Sessions are sorted by most recent first. Use restore (not reconnect) to get your
+full layout back.
+
+#### What happens after a crash?
+
+If neovim crashes, your shells keep running in tmux but lose their connection.
+The auto-save (running every 30s) has your latest layout saved.
+
+Just restart neovim and run:
+```vim
+:NeomuxRestoreSession
+```
+
+Your layout, terminals, and command history all come back. The shells automatically
+reconnect to the new neovim instance - no manual steps needed.
 
 #### Tmux public functions
 
