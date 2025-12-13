@@ -620,6 +620,8 @@ function! s:WriteNeomuxRc(rc_file, nvim_socket) abort
         \ printf('export NVIM="%s"', a:nvim_socket),
         \ printf('export NVIM_LISTEN_ADDRESS="%s"', a:nvim_socket),
         \ printf('export EDITOR="%s/nmux"', s:bin_folder),
+        \ printf('export NEOMUX_RC="%s"', a:rc_file),
+        \ printf('source "%s/funcs.sh"', s:bin_folder),
         \ ]
     call writefile(l:lines, a:rc_file)
 endfunction

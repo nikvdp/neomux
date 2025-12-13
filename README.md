@@ -482,6 +482,20 @@ Though auto-save runs every 30s, you can force a save before risky operations.
 Sessions are sorted by most recent first. Use restore (not reconnect) to get your
 full layout back.
 
+#### Refreshing stale shell environments
+
+If you have an existing shell inside a neomux tmux session that was started before
+neomux (or has a stale `$NVIM` environment variable), you can refresh it by sourcing
+the neomux RC file. Add this alias to your `.bashrc` or `.zshrc`:
+
+```bash
+alias nxr='source $(tmux show-environment -g NEOMUX_RC 2>/dev/null | cut -d= -f2)'
+```
+
+Then run `nxr` in any shell inside a neomux tmux session to refresh the environment.
+This sets up `$NVIM`, `$PATH` (to include neomux tools), and sources the helper
+functions (`e`, `s`, `vs`, `t`, `vw`, etc.).
+
 #### What happens after a crash?
 
 If neovim crashes, your shells keep running in tmux but lose their connection.
@@ -493,7 +507,8 @@ Just restart neovim and run:
 ```
 
 Your layout, terminals, and command history all come back. The shells automatically
-reconnect to the new neovim instance - no manual steps needed.
+reconnect to the new neovim instance - no manual steps needed. After reconnecting,
+run `nxr` in each shell to refresh the neomux environment variables.
 
 #### Tmux public functions
 
