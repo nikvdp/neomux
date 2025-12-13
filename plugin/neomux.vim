@@ -109,7 +109,7 @@ function! s:InstallNvrBinary(force) abort
         return
     endif
 
-    let l:api_url = 'https://api.github.com/repos/neomux/neomux/releases/latest'
+    let l:api_url = 'https://api.github.com/repos/nikvdp/neomux/releases/latest'
     let l:response = system('curl -fsSL ' . shellescape(l:api_url))
     if v:shell_error
         call s:WarnOnce('Unable to reach GitHub to download nvr-go. Install nvr manually or try :NeomuxInstallNvr later.')
@@ -130,7 +130,7 @@ function! s:InstallNvrBinary(force) abort
     endif
 
     let l:asset = s:ComposeAssetName(l:tag, l:platform)
-    let l:url = printf('https://github.com/neomux/neomux/releases/download/%s/%s', l:tag, l:asset)
+    let l:url = printf('https://github.com/nikvdp/neomux/releases/download/%s/%s', l:tag, l:asset)
     let l:tmpdir = s:this_folder . '/.nvr-go'
     if !isdirectory(l:tmpdir)
         call mkdir(l:tmpdir, 'p')
