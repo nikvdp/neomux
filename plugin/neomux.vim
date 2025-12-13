@@ -13,16 +13,184 @@ let s:this_folder = fnamemodify(resolve(expand('<sfile>:p')), ':h')
 let s:os = systemlist("uname -s")[0]
 let s:arch = systemlist("uname -m")[0]
 let s:bin_folder = printf("%s/bin", s:this_folder)
-let s:platform_bin_folder = printf("%s/%s.%s.bin", s:this_folder, s:os, s:arch)
+
+if !isdirectory(s:bin_folder)
+    call mkdir(s:bin_folder, 'p')
+endif
 
 " Set PATH and EDITOR vars for sub by subshells/processes
 " TODO: make this configurable
 " add bin folder to the *end* of the path so that nvr or other tools
 " installed by user will take precedence
-let $PATH=printf("%s:%s:%s", s:bin_folder, $PATH, s:platform_bin_folder)
+let $PATH=printf("%s:%s", s:bin_folder, $PATH)
 let $EDITOR=printf("%s/nmux", s:bin_folder)
 
+let s:nvr_warn_messages = []
+
+command! -nargs=0 NeomuxInstallNvr call s:InstallNvrBinary(1)
+
+function! s:WarnOnce(msg) abort
+    if index(s:nvr_warn_messages, a:msg) >= 0
+        return
+    endif
+    call add(s:nvr_warn_messages, a:msg)
+    echohl WarningMsg
+    echom 'neomux: ' . a:msg
+    echohl None
+endfunction
+
+function! s:DetectPlatform() abort
+    if has('macunix')
+        let l:os = 'darwin'
+    elseif has('unix')
+        let l:os = 'linux'
+    else
+        return {}
+    endif
+
+    let l:uname = tolower(trim(system('uname -m')))
+    if v:shell_error
+        return {}
+    endif
+
+    if l:uname ==# 'x86_64' || l:uname ==# 'amd64'
+        let l:arch = 'amd64'
+    elseif l:uname ==# 'arm64' || l:uname ==# 'aarch64'
+        let l:arch = 'arm64'
+    elseif l:uname =~# 'armv7'
+        let l:arch = 'armv7'
+    else
+        return {}
+    endif
+
+    return {'asset_os': l:os, 'asset_arch': l:arch}
+endfunction
+
+function! s:ComposeAssetName(tag, platform) abort
+    return printf('nvr-go_%s_%s_%s.tar.gz', a:tag, a:platform.asset_os, a:platform.asset_arch)
+endfunction
+
+function! s:LocalNvrPath() abort
+    return s:bin_folder . '/nvr'
+endfunction
+
+function! s:SetExecutable(path) abort
+    if exists('*setfperm')
+        call setfperm(a:path, 'rwxr-xr-x')
+    elseif has('unix')
+        call system('chmod 755 ' . shellescape(a:path))
+    endif
+endfunction
+
+function! s:InstallNvrBinary(force) abort
+    if executable('nvr')
+        return
+    endif
+
+    let l:target = s:LocalNvrPath()
+    if filereadable(l:target)
+        call s:SetExecutable(l:target)
+        return
+    endif
+
+    if !exists('*json_decode')
+        call s:WarnOnce('json_decode() is required to parse GitHub release metadata. Update Vim/Neovim or install nvr manually.')
+        return
+    endif
+
+    if !executable('curl') || !executable('tar')
+        call s:WarnOnce('curl and tar are required to download the bundled nvr-go binary. Install them or nvr manually.')
+        return
+    endif
+
+    let l:platform = s:DetectPlatform()
+    if empty(l:platform)
+        call s:WarnOnce('Unsupported platform for automatic nvr-go download. Please install nvr manually.')
+        return
+    endif
+
+    let l:api_url = 'https://api.github.com/repos/neomux/neomux/releases/latest'
+    let l:response = system('curl -fsSL ' . shellescape(l:api_url))
+    if v:shell_error
+        call s:WarnOnce('Unable to reach GitHub to download nvr-go. Install nvr manually or try :NeomuxInstallNvr later.')
+        return
+    endif
+
+    try
+        let l:data = json_decode(l:response)
+    catch
+        call s:WarnOnce('Unexpected response while checking nvr-go releases. Install nvr manually.')
+        return
+    endtry
+
+    let l:tag = get(l:data, 'tag_name', '')
+    if empty(l:tag)
+        call s:WarnOnce('Latest nvr-go release tag not found. Install nvr manually.')
+        return
+    endif
+
+    let l:asset = s:ComposeAssetName(l:tag, l:platform)
+    let l:url = printf('https://github.com/neomux/neomux/releases/download/%s/%s', l:tag, l:asset)
+    let l:tmpdir = s:this_folder . '/.nvr-go'
+    if !isdirectory(l:tmpdir)
+        call mkdir(l:tmpdir, 'p')
+    endif
+    let l:archive = l:tmpdir . '/' . l:asset
+    let l:download_cmd = printf('curl -fsSL --retry 3 --retry-delay 1 --connect-timeout 10 -o %s %s', shellescape(l:archive), shellescape(l:url))
+    call system(l:download_cmd)
+    if v:shell_error
+        call delete(l:archive)
+        call s:WarnOnce('Failed to download nvr-go archive. Install nvr manually or try :NeomuxInstallNvr later.')
+        return
+    endif
+
+    let l:extract_dir = l:tmpdir . '/extract'
+    call mkdir(l:extract_dir, 'p')
+    let l:extract_cmd = printf('tar -xzf %s -C %s', shellescape(l:archive), shellescape(l:extract_dir))
+    call system(l:extract_cmd)
+    call delete(l:archive)
+    if v:shell_error
+        call delete(l:extract_dir, 'rf')
+        call s:WarnOnce('Failed to extract nvr-go archive. Install nvr manually or try :NeomuxInstallNvr later.')
+        return
+    endif
+
+    let l:candidates = glob(l:extract_dir . '/nvr', 0, 1)
+    if empty(l:candidates)
+        let l:candidates = glob(l:extract_dir . '/**/nvr', 0, 1)
+    endif
+    if empty(l:candidates)
+        call delete(l:extract_dir, 'rf')
+        call s:WarnOnce('nvr binary not found in archive. Install nvr manually.')
+        return
+    endif
+
+    if filereadable(l:target)
+        call delete(l:target)
+    endif
+    if rename(l:candidates[0], l:target) != 0
+        call delete(l:extract_dir, 'rf')
+        call s:WarnOnce('Unable to move nvr binary into place. Install nvr manually.')
+        return
+    endif
+    call delete(l:extract_dir, 'rf')
+    call delete(l:tmpdir, 'rf')
+    call s:SetExecutable(l:target)
+
+    if a:force
+        echom 'neomux: downloaded nvr-go ' . l:tag
+    endif
+endfunction
+
+function! s:EnsureNvrBinary() abort
+    if executable('nvr')
+        return
+    endif
+    call s:InstallNvrBinary(0)
+endfunction
+
 function! s:NeomuxMain()
+    call s:EnsureNvrBinary()
     " Set default key bindings if no user defined maps present
     " TODO: use a dict of vars and defaults and iterate through it, below is
     "       getting unwieldy. maybe use lua?
@@ -270,4 +438,3 @@ endfunction
 
 
 call s:NeomuxMain()
-
