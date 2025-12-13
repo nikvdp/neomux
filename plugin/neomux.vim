@@ -887,8 +887,8 @@ function! NeomuxTmuxListSessions() abort
     return map(l:with_mtime, {_, v -> v[0]})
 endfunction
 
-function! s:GetSessionDisplayLabel(internal_name) abort
-    " Get a display label for a session: "display_name (internal)" or just "internal"
+function! s:FormatSessionPickerLabel(internal_name) abort
+    " Get a display label for a session picker: "display_name (internal)" or just "internal"
     let l:socket = printf('%s/%s.tmux-socket', g:neomux_tmux_cache_dir, a:internal_name)
     let l:display = s:TmuxGetDisplayName(l:socket)
     
@@ -913,7 +913,7 @@ function! NeomuxTmuxListSessionsForPicker() abort
     " List sessions with display names for picker UI
     " Returns list of display labels that can be parsed with s:ParseSessionFromLabel()
     let l:internal_names = NeomuxTmuxListSessions()
-    return map(l:internal_names, {_, v -> s:GetSessionDisplayLabel(v)})
+    return map(l:internal_names, {_, v -> s:FormatSessionPickerLabel(v)})
 endfunction
 
 function! s:TmuxListMainSessions(socket_path) abort
