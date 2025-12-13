@@ -245,8 +245,8 @@ function! s:NeomuxMain()
     command! NeomuxTmuxReconnect call NeomuxTmuxReconnectPicker()
     command! NeomuxTmuxClean call NeomuxTmuxClean()
     command! -nargs=1 NeomuxTmuxReconnectTo call NeomuxTmuxReconnect(<q-args>)
-    command! -nargs=1 NeomuxRename call NeomuxRename(<q-args>)
-    command! -nargs=0 NeomuxRenamePrompt call NeomuxRenamePrompt()
+    command! -nargs=1 NeomuxRenameTerminal call NeomuxRenameTerminal(<q-args>)
+    command! -nargs=0 NeomuxRenameTerminalPrompt call NeomuxRenameTerminalPrompt()
     command! -nargs=1 NeomuxRenameSession call NeomuxRenameSession(<q-args>)
     command! -nargs=0 NeomuxRenameSessionPrompt call NeomuxRenameSessionPrompt()
     
@@ -318,7 +318,7 @@ function! s:NeomuxMain()
         execute printf('noremap %s :call NeomuxTmuxKillServer()<CR>', g:neomux_tmux_kill_map)
         execute printf('noremap %s :call NeomuxTmuxKillServer()<CR>:qa<CR>', g:neomux_tmux_quit_map)
         execute printf('noremap %s :call NeomuxTmuxReconnectPicker()<CR>', g:neomux_tmux_reconnect_map)
-        execute printf('noremap %s :call NeomuxRenamePrompt()<CR>', g:neomux_rename_term_map)
+        execute printf('noremap %s :call NeomuxRenameTerminalPrompt()<CR>', g:neomux_rename_term_map)
     endif
 endfunction
 
@@ -772,8 +772,17 @@ function! s:GenerateDefaultTerminalName() abort
     return l:dir_name
 endfunction
 
-function! s:GetSessionWord() abort
-    " Extract the random word from the session name (e.g., 'neomux_Arum' -> 'Arum')
+function! s:GetSessionDisplayLabel() abort
+    " Get a short label for the session to use in buffer names
+    " Uses display name if set, otherwise extracts word from internal name
+    if exists('g:neomux_tmux_socket_file') && !empty(g:neomux_tmux_socket_file)
+        let l:display = s:TmuxGetDisplayName(g:neomux_tmux_socket_file)
+        if !empty(l:display)
+            return l:display
+        endif
+    endif
+    
+    " Fall back to extracting word from internal session name (e.g., 'neomux_Arum' -> 'Arum')
     if exists('g:neomux_tmux_session') && !empty(g:neomux_tmux_session)
         let l:parts = split(g:neomux_tmux_session, '_')
         if len(l:parts) >= 2
@@ -786,17 +795,17 @@ endfunction
 
 function! s:SetNeomuxBufferName(bufnr, name) abort
     " Set the neovim buffer name for a neomux terminal
-    " Includes session word for identification: neomux://Arum/term
+    " Format: neomux:<session_label>:<terminal_name>
     " Handles uniqueness by appending <N> suffix if needed
     " Returns a dict with 'base' (the original name) and 'full' (with prefix and possible suffix)
-    let l:session_word = s:GetSessionWord()
-    if !empty(l:session_word)
-        let l:display_name = l:session_word . ':' . a:name
+    let l:session_label = s:GetSessionDisplayLabel()
+    if !empty(l:session_label)
+        let l:display_name = l:session_label . ':' . a:name
     else
         let l:display_name = a:name
     endif
     
-    let l:fullname = 'nmux:' . l:display_name
+    let l:fullname = 'neomux:' . l:display_name
     let l:final_name = a:name
     
     " Check for existing buffer with same name
@@ -1079,7 +1088,7 @@ function! NeomuxTmuxClean() abort
     echom printf('neomux: Cleaned %d orphaned session(s)', l:count)
 endfunction
 
-function! NeomuxRename(name) abort
+function! NeomuxRenameTerminal(name) abort
     " Rename the current neomux terminal
     " Updates both tmux window name and neovim buffer name
     
@@ -1112,7 +1121,7 @@ function! NeomuxRename(name) abort
     echom printf("neomux: Renamed terminal to '%s'", l:final_name)
 endfunction
 
-function! NeomuxRenamePrompt() abort
+function! NeomuxRenameTerminalPrompt() abort
     " Prompt user for a new terminal name
     if !exists('b:neomux_tmux_socket')
         echom 'neomux: Current buffer is not a neomux tmux terminal'
@@ -1122,13 +1131,14 @@ function! NeomuxRenamePrompt() abort
     let l:current = exists('b:neomux_term_name') ? b:neomux_term_name : ''
     let l:name = input('New terminal name: ', l:current)
     if !empty(l:name)
-        call NeomuxRename(l:name)
+        call NeomuxRenameTerminal(l:name)
     endif
 endfunction
 
 function! NeomuxRenameSession(name) abort
     " Rename the current neomux session (sets display name)
     " The internal name (used for socket files) remains unchanged
+    " Also updates all neomux terminal buffer names to reflect the new session name
     
     if !exists('g:neomux_tmux_socket_file') || empty(g:neomux_tmux_socket_file)
         echom 'neomux: No active neomux session'
@@ -1142,11 +1152,37 @@ function! NeomuxRenameSession(name) abort
     endif
     
     let l:success = s:TmuxSetDisplayName(g:neomux_tmux_socket_file, l:name)
-    if l:success
-        echom printf("neomux: Session renamed to '%s'", l:name)
-    else
+    if !l:success
         echom 'neomux: Failed to rename session'
+        return
     endif
+    
+    " Update all neomux terminal buffer names to use new session label
+    call s:RefreshAllTerminalBufferNames()
+    
+    echom printf("neomux: Session renamed to '%s'", l:name)
+endfunction
+
+function! s:RefreshAllTerminalBufferNames() abort
+    " Refresh buffer names for all neomux terminals in current session
+    " Called after session rename to update the session label in buffer names
+    for l:bufnr in range(1, bufnr('$'))
+        if !bufexists(l:bufnr)
+            continue
+        endif
+        let l:socket = getbufvar(l:bufnr, 'neomux_tmux_socket', '')
+        if empty(l:socket)
+            continue
+        endif
+        " Only update terminals from this session
+        if l:socket !=# g:neomux_tmux_socket_file
+            continue
+        endif
+        let l:term_name = getbufvar(l:bufnr, 'neomux_term_name', '')
+        if !empty(l:term_name)
+            call s:SetNeomuxBufferName(l:bufnr, l:term_name)
+        endif
+    endfor
 endfunction
 
 function! NeomuxRenameSessionPrompt() abort

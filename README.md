@@ -393,7 +393,7 @@ tmux and neovim, with tmux as the source of truth:
 
 - New terminals are automatically named based on the current directory
 - Names are stored in tmux window names and reflected in neovim buffer names
-- Use `:NeomuxRename <name>` or `<Leader>nn` to rename terminals
+- Use `:NeomuxRenameTerminal <name>` or `<Leader>nn` to rename terminals
 - Names are preserved and restored when reconnecting to orphaned sessions
 
 #### Tmux commands
@@ -402,9 +402,9 @@ tmux and neovim, with tmux as the source of truth:
 - `:NeomuxTmuxReconnect` - Open a picker to reconnect to orphaned sessions.
 - `:NeomuxTmuxReconnectTo <name>` - Reconnect to a specific session by name.
 - `:NeomuxTmuxClean` - Clean up reattached session markers.
-- `:NeomuxRename <name>` - Rename the current terminal (syncs tmux and neovim).
-- `:NeomuxRenamePrompt` - Prompt for a new terminal name.
-- `:NeomuxRenameSession <name>` - Rename the current session (display name only).
+- `:NeomuxRenameTerminal <name>` - Rename the current terminal.
+- `:NeomuxRenameTerminalPrompt` - Prompt for a new terminal name.
+- `:NeomuxRenameSession <name>` - Rename the current session (display name).
 - `:NeomuxRenameSessionPrompt` - Prompt for a new session name.
 
 #### Reconnecting to sessions
@@ -436,7 +436,7 @@ eval $(tmux show-env -g NEOMUX_RC) && source $NEOMUX_RC
 - `NeomuxTmuxClean()` - Cleans up reattached session markers.
 - `NeomuxTerminalName([bufnr])` - Returns the terminal name for a buffer.
 - `NeomuxIsTerminal([bufnr])` - Returns true if buffer is a neomux terminal.
-- `NeomuxRename(name)` - Renames the current terminal.
+- `NeomuxRenameTerminal(name)` - Renames the current terminal.
 - `NeomuxRenameSession(name)` - Sets the session display name.
 
 ### Miscellanea / troubleshooting
