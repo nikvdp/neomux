@@ -373,6 +373,9 @@ When enabled, `:Neomux` will:
   sockets and session files.
 - `g:neomux_tmux_session_name` - Default: auto-generated. Override the
   auto-generated session name.
+- `g:neomux_tmux_autosave_interval` - Default: `30`. Interval in seconds for
+  automatic session saves. Set to `0` to disable autosave. Autosave runs
+  silently in the background and allows session recovery if neovim crashes.
 
 #### Tmux keybindings (only active when tmux is enabled)
 

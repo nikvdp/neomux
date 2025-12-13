@@ -231,6 +231,8 @@ function! s:NeomuxMain()
     if !exists('g:neomux_tmux_kill_map') | let g:neomux_tmux_kill_map = '<Leader>nk' | endif
     if !exists('g:neomux_tmux_quit_map') | let g:neomux_tmux_quit_map = '<Leader>nq' | endif
     if !exists('g:neomux_tmux_reconnect_map') | let g:neomux_tmux_reconnect_map = '<Leader>nr' | endif
+    " Autosave interval in seconds (0 to disable, default 30)
+    if !exists('g:neomux_tmux_autosave_interval') | let g:neomux_tmux_autosave_interval = 30 | endif
     
     " Terminal naming settings (only relevant when tmux is enabled)
     if !exists('g:neomux_terminal_name_prefix') | let g:neomux_terminal_name_prefix = 'neomux://' | endif
@@ -416,6 +418,9 @@ function! NeomuxTerm(...)
         " Use the final name so tmux and neovim stay in sync
         " Retry up to 10 times (1 second total) to handle slow tmux startup
         call s:TmuxSetWindowNameWithRetry(b:neomux_tmux_socket, b:neomux_tmux_session, l:name_result.final, 10)
+        
+        " Start autosave timer if not already running
+        call s:StartAutosaveTimer()
     endif
 endfunction
 
@@ -908,6 +913,9 @@ function! NeomuxTmuxReconnect(session_name) abort
         let l:first = 0
         call s:TmuxStartTermAndConnect(l:socket, l:sess.session, l:sess.window_name)
     endfor
+    
+    " Start autosave timer after reconnect
+    call s:StartAutosaveTimer()
     
     echom printf("neomux: Reconnected to '%s' (%d terminals)", a:session_name, len(l:sessions))
 endfunction
@@ -1447,12 +1455,73 @@ function! NeomuxRestoreSession(...) abort
     
     let l:state = json_decode(l:json)
     call s:RestoreSessionState(l:state)
+    
+    " Start autosave timer after restore
+    call s:StartAutosaveTimer()
+    
     echom printf('neomux: Session restored from tmux (%s)', l:session_name)
 endfunction
 
 function! s:RestoreSessionByName(session_name) abort
     " Helper for fzf callback
     call NeomuxRestoreSession(a:session_name)
+endfunction
+
+" ============================================================================
+" Autosave Functions
+" ============================================================================
+
+let s:autosave_timer_id = -1
+
+function! s:AutosaveCallback(timer_id) abort
+    " Timer callback for autosaving session state
+    " Only save if we have an active tmux session
+    if !exists('g:neomux_tmux_socket_file') || empty(g:neomux_tmux_socket_file)
+        return
+    endif
+    
+    " Silently save without echoing messages
+    let l:state = s:CaptureSessionState()
+    let l:json = json_encode(l:state)
+    call s:TmuxSaveSessionState(g:neomux_tmux_socket_file, l:json)
+endfunction
+
+function! s:StartAutosaveTimer() abort
+    " Start the autosave timer if configured
+    " Called when first neomux terminal is created
+    
+    " Don't start if autosave is disabled
+    if g:neomux_tmux_autosave_interval <= 0
+        return
+    endif
+    
+    " Don't start if timer is already running
+    if s:autosave_timer_id >= 0
+        return
+    endif
+    
+    " Convert seconds to milliseconds
+    let l:interval_ms = g:neomux_tmux_autosave_interval * 1000
+    
+    " Start repeating timer
+    let s:autosave_timer_id = timer_start(l:interval_ms, function('s:AutosaveCallback'), {'repeat': -1})
+endfunction
+
+function! s:StopAutosaveTimer() abort
+    " Stop the autosave timer
+    if s:autosave_timer_id >= 0
+        call timer_stop(s:autosave_timer_id)
+        let s:autosave_timer_id = -1
+    endif
+endfunction
+
+function! NeomuxAutosaveStatus() abort
+    " Return the current autosave status for debugging/statusline
+    if s:autosave_timer_id >= 0
+        return printf('autosave: %ds', g:neomux_tmux_autosave_interval)
+    else
+        return 'autosave: off'
+    endif
 endfunction
 
 
