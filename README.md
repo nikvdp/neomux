@@ -29,7 +29,9 @@ For more info see the [tutorial](#tutorial).
 1. Install neovim. 
 2. Install this plugin into neovim via your favorite plugin manager
    ([vim-plug][vim-plug] is a good place to start)
-3. (Optional, for speed) install [neovim-remote][neovim-remote].
+3. Neomux will automatically download [nvr-go](https://github.com/nikvdp/neomux/releases) 
+   on first run. For offline installation or manual setup, install [neovim-remote][neovim-remote]
+   via `pip install neovim-remote` or download nvr-go from releases.
 
 
 # Usage
@@ -351,20 +353,46 @@ Configure neomux by setting any of these variables in your `.vimrc` / `init.vim`
 
 ### Tmux integration
 
-Neomux can optionally wrap terminals in persistent [tmux][tmux] sessions. This
-allows your shell sessions to survive neovim restarts, and lets you reconnect
-to orphaned sessions from new neovim instances.
+Neomux can optionally wrap terminals in persistent [tmux][tmux] sessions, making
+your shell sessions survive neovim crashes and restarts.
 
-To enable tmux integration, add this to your `init.vim`:
+#### Why use tmux integration?
+
+Without tmux, your shell sessions die when neovim exits. With tmux integration:
+- **Crash recovery**: If neovim crashes, your shells keep running in tmux
+- **Session persistence**: Close neovim, reopen later, reconnect to same shells
+- **Auto-save**: Session layouts saved every 30s (configurable)
+- **Named sessions**: Give sessions memorable names, reconnect by name
+
+#### How it works
+
+When tmux integration is enabled, each `:Neomux` terminal runs inside its own
+tmux session. All these sessions are grouped under a single neomux "session"
+(named like `myproject_wonderland`). The session name shows in your statusline.
+
+If neovim exits (crash or normal quit), the tmux sessions keep running in the
+background. Start neovim again and use `:NeomuxTmuxReconnect` to pick up where
+you left off - all your terminals, in the same layout, with command history intact.
+
+#### Setup
+
+Add to your `init.vim`:
 
 ```vim
 let g:neomux_enable_tmux = 1
 ```
 
-When enabled, `:Neomux` will:
-1. Create a tmux session with a unique name (based on git repo + random word)
-2. Store the tmux socket in `~/.cache/neomux/`
-3. Set up environment variables so shell helpers continue to work
+That's it! Now `:Neomux` creates persistent terminals.
+
+#### Basic usage
+
+1. **Start terminals**: `:Neomux` works the same, but terminals now persist
+2. **Name your session** (optional): `:NeomuxRenameSession myproject`
+3. **Save layout** (optional): `:NeomuxSaveSession` (auto-saves every 30s anyway)
+4. **Close neovim**: Your shells keep running in tmux
+5. **Reconnect later**: Start neovim, run `:NeomuxTmuxReconnect`, pick your session
+
+Your terminal layout, names, and command history all restore automatically.
 
 #### Tmux configuration options
 
@@ -406,23 +434,42 @@ tmux and neovim, with tmux as the source of truth:
 - `:NeomuxRenameTerminalPrompt` - Prompt for a new terminal name.
 - `:NeomuxRenameSession <name>` - Rename the current session (display name).
 - `:NeomuxRenameSessionPrompt` - Prompt for a new session name.
+- `:NeomuxSaveSession` - Manually save current session state to tmux.
+- `:NeomuxRestoreSession [name]` - Restore a saved session (opens picker if no name given).
 
-#### Reconnecting to sessions
+#### Common workflows
 
-If neovim exits but your tmux sessions are still running, you can reconnect
-from a new neovim instance:
-
-1. Start neovim and enable tmux mode (`let g:neomux_enable_tmux = 1`)
-2. Press `<Leader>nr` or run `:NeomuxTmuxReconnect`
-3. Select the session to reconnect to from the picker
-
-After reconnecting, old shells need to update their neovim socket reference.
-The reconnect command stores this in the `@n` register:
-
-```bash
-# Run this in old shells to update their connection
-eval $(tmux show-env -g NEOMUX_RC) && source $NEOMUX_RC
+**Rename your session for easy reconnection:**
+```vim
+:NeomuxRenameSession myproject
 ```
+Now the session appears as "myproject" in the reconnect picker.
+
+**Rename individual terminals:**
+```vim
+:NeomuxRenameTerminal server    " or press <Leader>nn
+```
+Terminal names show in buffer names and are preserved across reconnects.
+
+**Manually save session:**
+```vim
+:NeomuxSaveSession
+```
+Though auto-save runs every 30s, you can force a save before risky operations.
+
+**Reconnect to crashed/closed session:**
+```vim
+:NeomuxTmuxReconnect           " Pick from list (or press <Leader>nr)
+:NeomuxRestoreSession          " Same thing - saves + reconnects
+```
+Sessions are sorted by most recent first.
+
+#### Reconnecting after neovim crashes
+
+If neovim crashes, your shells keep running but lose connection to neovim. When
+you reconnect via `:NeomuxTmuxReconnect`, old shell sessions automatically get
+updated to point to the new neovim instance. Just restart neovim and reconnect -
+everything works immediately.
 
 #### Tmux public functions
 
@@ -444,12 +491,13 @@ eval $(tmux show-env -g NEOMUX_RC) && source $NEOMUX_RC
 - If you want a simple way to send keys to a neomux terminal session you can do
   so via the `NeomuxSend(keys)` function. 
 
-- Neomux relies heavily on the excellent [neovim-remote][neovim-remote], and
-  includes amd64 binaries for neovim-remote for MacOS and Linux as they are the
-  most popular platforms. If you're on Windows or using another chipset (e.g.
-  Raspberry pi/ARM) you will need to install python and `pip` manually, and
-  then install neovim-remote via `pip install neovim-remote` before neomux will
-  work.
+- Neomux uses [nvr-go](https://github.com/nikvdp/neomux/releases) or 
+  [neovim-remote][neovim-remote] to communicate with neovim from shell sessions.
+  On first run, neomux automatically downloads the appropriate nvr-go binary for
+  your platform (darwin/linux, amd64/arm64/armv7). If automatic download fails
+  (offline, firewall, etc.), install manually via `pip install neovim-remote` or
+  download nvr-go from releases and place in `plugin/bin/nvr`. You can retry
+  automatic installation with `:NeomuxInstallNvr`.
 
 
 [vim-plug]: https://github.com/junegunn/vim-plug 
