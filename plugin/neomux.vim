@@ -247,6 +247,8 @@ function! s:NeomuxMain()
     command! -nargs=1 NeomuxTmuxReconnectTo call NeomuxTmuxReconnect(<q-args>)
     command! -nargs=1 NeomuxRename call NeomuxRename(<q-args>)
     command! -nargs=0 NeomuxRenamePrompt call NeomuxRenamePrompt()
+    command! -nargs=1 NeomuxRenameSession call NeomuxRenameSession(<q-args>)
+    command! -nargs=0 NeomuxRenameSessionPrompt call NeomuxRenameSessionPrompt()
     
     " Session save/restore commands
     command! -nargs=0 NeomuxSaveSession call NeomuxSaveSession()
@@ -673,6 +675,48 @@ function! NeomuxTmuxSessionName() abort
     return ''
 endfunction
 
+function! s:TmuxGetDisplayName(socket) abort
+    " Get the display name from tmux environment, or empty string if not set
+    let l:cmd = printf("tmux -S %s show-environment -g NEOMUX_DISPLAY_NAME 2>/dev/null",
+                \ shellescape(a:socket))
+    let l:output = trim(system(l:cmd))
+    
+    if v:shell_error || empty(l:output)
+        return ''
+    endif
+    
+    " Output is "NEOMUX_DISPLAY_NAME=<name>", extract the value
+    let l:idx = stridx(l:output, '=')
+    if l:idx < 0
+        return ''
+    endif
+    
+    return l:output[l:idx + 1:]
+endfunction
+
+function! s:TmuxSetDisplayName(socket, name) abort
+    " Set the display name in tmux environment
+    let l:cmd = printf("tmux -S %s set-environment -g NEOMUX_DISPLAY_NAME %s 2>/dev/null",
+                \ shellescape(a:socket), shellescape(a:name))
+    call system(l:cmd)
+    return !v:shell_error
+endfunction
+
+function! NeomuxSessionDisplayName() abort
+    " Get the display name for the current session (or internal name if no display name set)
+    if !exists('g:neomux_tmux_socket_file') || empty(g:neomux_tmux_socket_file)
+        return ''
+    endif
+    
+    let l:display = s:TmuxGetDisplayName(g:neomux_tmux_socket_file)
+    if !empty(l:display)
+        return l:display
+    endif
+    
+    " Fall back to internal session name
+    return exists('g:neomux_tmux_session') ? g:neomux_tmux_session : ''
+endfunction
+
 function! s:TmuxSetWindowName(socket, target, name) abort
     " Set the tmux window name for a target (session:window or just session for active window)
     " Also disables automatic-rename to prevent tmux from overwriting it
@@ -802,7 +846,7 @@ endfunction
 
 function! NeomuxTmuxListSessions() abort
     " List all active neomux tmux sessions by finding open sockets
-    " Returns a list of session names, sorted by most recently modified first
+    " Returns a list of internal session names, sorted by most recently modified first
     let l:sessions = []
     
     " Use lsof to find tmux processes with neomux sockets
@@ -832,6 +876,35 @@ function! NeomuxTmuxListSessions() abort
     
     " Extract just the session names
     return map(l:with_mtime, {_, v -> v[0]})
+endfunction
+
+function! s:GetSessionDisplayLabel(internal_name) abort
+    " Get a display label for a session: "display_name (internal)" or just "internal"
+    let l:socket = printf('%s/%s.tmux-socket', g:neomux_tmux_cache_dir, a:internal_name)
+    let l:display = s:TmuxGetDisplayName(l:socket)
+    
+    if !empty(l:display) && l:display !=# a:internal_name
+        return printf('%s (%s)', l:display, a:internal_name)
+    endif
+    return a:internal_name
+endfunction
+
+function! s:ParseSessionFromLabel(label) abort
+    " Extract internal session name from a display label
+    " "display_name (internal)" -> "internal"
+    " "internal" -> "internal"
+    let l:match = matchstr(a:label, '(\zs[^)]\+\ze)$')
+    if !empty(l:match)
+        return l:match
+    endif
+    return a:label
+endfunction
+
+function! NeomuxTmuxListSessionsForPicker() abort
+    " List sessions with display names for picker UI
+    " Returns list of display labels that can be parsed with s:ParseSessionFromLabel()
+    let l:internal_names = NeomuxTmuxListSessions()
+    return map(l:internal_names, {_, v -> s:GetSessionDisplayLabel(v)})
 endfunction
 
 function! s:TmuxListMainSessions(socket_path) abort
@@ -933,29 +1006,35 @@ function! NeomuxTmuxReconnect(session_name) abort
     echom printf("neomux: Reconnected to '%s' (%d terminals)", a:session_name, len(l:sessions))
 endfunction
 
+function! s:ReconnectFromLabel(label) abort
+    " Wrapper for fzf sink that parses the display label
+    let l:internal = s:ParseSessionFromLabel(a:label)
+    call NeomuxTmuxReconnect(l:internal)
+endfunction
+
 function! NeomuxTmuxReconnectPicker() abort
     " Open fzf picker to select a session to reconnect to
-    let l:sessions = NeomuxTmuxListSessions()
+    let l:labels = NeomuxTmuxListSessionsForPicker()
     
-    if empty(l:sessions)
+    if empty(l:labels)
         echom 'neomux: No active tmux sessions found'
         return
     endif
     
     " Check if fzf is available
     if exists('*fzf#run')
-        call fzf#run({'source': l:sessions, 'sink': function('NeomuxTmuxReconnect')})
+        call fzf#run({'source': l:labels, 'sink': function('s:ReconnectFromLabel')})
     else
         " Fallback: show inputlist
         let l:choices = ['Select session to reconnect:']
         let l:idx = 1
-        for l:sess in l:sessions
-            call add(l:choices, printf('%d. %s', l:idx, l:sess))
+        for l:label in l:labels
+            call add(l:choices, printf('%d. %s', l:idx, l:label))
             let l:idx += 1
         endfor
         let l:choice = inputlist(l:choices)
-        if l:choice > 0 && l:choice <= len(l:sessions)
-            call NeomuxTmuxReconnect(l:sessions[l:choice - 1])
+        if l:choice > 0 && l:choice <= len(l:labels)
+            call s:ReconnectFromLabel(l:labels[l:choice - 1])
         endif
     endif
 endfunction
@@ -1044,6 +1123,43 @@ function! NeomuxRenamePrompt() abort
     let l:name = input('New terminal name: ', l:current)
     if !empty(l:name)
         call NeomuxRename(l:name)
+    endif
+endfunction
+
+function! NeomuxRenameSession(name) abort
+    " Rename the current neomux session (sets display name)
+    " The internal name (used for socket files) remains unchanged
+    
+    if !exists('g:neomux_tmux_socket_file') || empty(g:neomux_tmux_socket_file)
+        echom 'neomux: No active neomux session'
+        return
+    endif
+    
+    let l:name = trim(a:name)
+    if empty(l:name)
+        echom 'neomux: Name cannot be empty'
+        return
+    endif
+    
+    let l:success = s:TmuxSetDisplayName(g:neomux_tmux_socket_file, l:name)
+    if l:success
+        echom printf("neomux: Session renamed to '%s'", l:name)
+    else
+        echom 'neomux: Failed to rename session'
+    endif
+endfunction
+
+function! NeomuxRenameSessionPrompt() abort
+    " Prompt user for a new session name
+    if !exists('g:neomux_tmux_socket_file') || empty(g:neomux_tmux_socket_file)
+        echom 'neomux: No active neomux session'
+        return
+    endif
+    
+    let l:current = NeomuxSessionDisplayName()
+    let l:name = input('New session name: ', l:current)
+    if !empty(l:name)
+        call NeomuxRenameSession(l:name)
     endif
 endfunction
 
@@ -1406,7 +1522,8 @@ function! NeomuxSaveSession() abort
     
     let l:success = s:TmuxSaveSessionState(g:neomux_tmux_socket_file, l:json)
     if l:success
-        echom printf("neomux: Session '%s' saved. Restore with :NeomuxRestoreSession %s", g:neomux_tmux_session, g:neomux_tmux_session)
+        let l:display = NeomuxSessionDisplayName()
+        echom printf("neomux: Session '%s' saved. Restore with :NeomuxRestoreSession %s", l:display, g:neomux_tmux_session)
     else
         echom 'neomux: Failed to save session to tmux'
     endif
@@ -1419,34 +1536,34 @@ function! NeomuxRestoreSession(...) abort
     let l:session_name = ''
     
     if a:0 > 0
-        " Session name provided as argument
-        let l:session_name = a:1
+        " Session name provided as argument (could be display label or internal name)
+        let l:session_name = s:ParseSessionFromLabel(a:1)
     else
         " Pick from available sessions
-        let l:sessions = NeomuxTmuxListSessions()
-        if empty(l:sessions)
+        let l:labels = NeomuxTmuxListSessionsForPicker()
+        if empty(l:labels)
             echom 'neomux: No active tmux sessions found'
             return
         endif
         
         " If only one session, use it
-        if len(l:sessions) == 1
-            let l:session_name = l:sessions[0]
+        if len(l:labels) == 1
+            let l:session_name = s:ParseSessionFromLabel(l:labels[0])
         else
             " Multiple sessions - use fzf or inputlist
             if exists('*fzf#run')
-                call fzf#run({'source': l:sessions, 'sink': function('s:RestoreSessionByName')})
+                call fzf#run({'source': l:labels, 'sink': function('s:RestoreSessionByLabel')})
                 return
             else
                 let l:choices = ['Select session to restore:']
                 let l:idx = 1
-                for l:sess in l:sessions
-                    call add(l:choices, printf('%d. %s', l:idx, l:sess))
+                for l:label in l:labels
+                    call add(l:choices, printf('%d. %s', l:idx, l:label))
                     let l:idx += 1
                 endfor
                 let l:choice = inputlist(l:choices)
-                if l:choice > 0 && l:choice <= len(l:sessions)
-                    let l:session_name = l:sessions[l:choice - 1]
+                if l:choice > 0 && l:choice <= len(l:labels)
+                    let l:session_name = s:ParseSessionFromLabel(l:labels[l:choice - 1])
                 else
                     return
                 endif
@@ -1472,7 +1589,14 @@ function! NeomuxRestoreSession(...) abort
     " Start autosave timer after restore
     call s:StartAutosaveTimer()
     
-    echom printf('neomux: Session restored from tmux (%s)', l:session_name)
+    let l:display = NeomuxSessionDisplayName()
+    echom printf('neomux: Session restored from tmux (%s)', l:display)
+endfunction
+
+function! s:RestoreSessionByLabel(label) abort
+    " Helper for fzf callback - parses label and restores
+    let l:internal = s:ParseSessionFromLabel(a:label)
+    call NeomuxRestoreSession(l:internal)
 endfunction
 
 function! s:RestoreSessionByName(session_name) abort
