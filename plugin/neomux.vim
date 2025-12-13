@@ -1393,7 +1393,7 @@ function! NeomuxSaveSession() abort
     
     let l:success = s:TmuxSaveSessionState(g:neomux_tmux_socket_file, l:json)
     if l:success
-        echom 'neomux: Session saved to tmux'
+        echom printf("neomux: Session '%s' saved. Restore with :NeomuxRestoreSession %s", g:neomux_tmux_session, g:neomux_tmux_session)
     else
         echom 'neomux: Failed to save session to tmux'
     endif
