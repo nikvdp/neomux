@@ -33,7 +33,7 @@ checksum:
 
 release:
   github:
-    owner: neomux
+    owner: nikvdp
     name: neomux
 
 changelog:
