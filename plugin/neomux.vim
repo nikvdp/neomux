@@ -802,7 +802,7 @@ endfunction
 
 function! NeomuxTmuxListSessions() abort
     " List all active neomux tmux sessions by finding open sockets
-    " Returns a list of session names
+    " Returns a list of session names, sorted by most recently modified first
     let l:sessions = []
     
     " Use lsof to find tmux processes with neomux sockets
@@ -818,7 +818,20 @@ function! NeomuxTmuxListSessions() abort
         endif
     endfor
     
-    return l:sessions
+    " Sort by socket file modification time (most recent first)
+    " Build list of [session, mtime] pairs
+    let l:with_mtime = []
+    for l:sess in l:sessions
+        let l:socket_path = printf('%s/%s.tmux-socket', g:neomux_tmux_cache_dir, l:sess)
+        let l:mtime = getftime(l:socket_path)
+        call add(l:with_mtime, [l:sess, l:mtime])
+    endfor
+    
+    " Sort by mtime descending (most recent first)
+    call sort(l:with_mtime, {a, b -> b[1] - a[1]})
+    
+    " Extract just the session names
+    return map(l:with_mtime, {_, v -> v[0]})
 endfunction
 
 function! s:TmuxListMainSessions(socket_path) abort
