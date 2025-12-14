@@ -138,6 +138,8 @@ function! s:InstallNvrBinary(force) abort
 
     let l:asset = s:ComposeAssetName(l:tag, l:platform)
     let l:url = printf('https://github.com/nikvdp/nvr-go/releases/download/%s/%s', l:tag, l:asset)
+    echom 'neomux: downloading nvr-go ' . l:tag . '...'
+    redraw
     let l:tmpdir = s:this_folder . '/.nvr-go'
     if !isdirectory(l:tmpdir)
         call mkdir(l:tmpdir, 'p')
@@ -184,9 +186,7 @@ function! s:InstallNvrBinary(force) abort
     call delete(l:tmpdir, 'rf')
     call s:SetExecutable(l:target)
 
-    if a:force
-        echom 'neomux: downloaded nvr-go ' . l:tag
-    endif
+    echom 'neomux: nvr-go ' . l:tag . ' installed successfully'
 endfunction
 
 function! s:EnsureNvrBinary() abort
