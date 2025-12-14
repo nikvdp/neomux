@@ -1360,7 +1360,7 @@ function! s:EnsureLayoutTree(layout, state_count) abort
 endfunction
 
 function! s:CaptureTabState(tabnr) abort
-    " Capture the state of a single tab, including window layout
+    " Capture the state of a single tab, including window layout and tab name
     let l:return_winid = win_getid()
     execute 'tabnext ' . a:tabnr
     
@@ -1368,9 +1368,16 @@ function! s:CaptureTabState(tabnr) abort
     let l:meta = {'active': 0}
     let l:layout = s:SerializeLayoutTree(winlayout(a:tabnr), l:states, win_getid(), l:meta)
     
+    " Capture tab name if set
+    let l:tab_name = gettabvar(a:tabnr, 'tab_name', '')
+    
     call win_gotoid(l:return_winid)
     
-    return {'layout': l:layout, 'states': l:states, 'active': l:meta.active}
+    let l:result = {'layout': l:layout, 'states': l:states, 'active': l:meta.active}
+    if !empty(l:tab_name)
+        let l:result.tab_name = l:tab_name
+    endif
+    return l:result
 endfunction
 
 function! s:CaptureSessionState() abort
@@ -1464,6 +1471,11 @@ function! s:RestoreTabLayout(tabstate) abort
             enew
         endif
     endfor
+    
+    " Restore tab name if present
+    if has_key(a:tabstate, 'tab_name') && !empty(a:tabstate.tab_name)
+        let t:tab_name = a:tabstate.tab_name
+    endif
     
     let l:target = get(a:tabstate, 'active', 0)
     for l:leaf in l:leaves
