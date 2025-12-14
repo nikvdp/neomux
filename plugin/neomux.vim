@@ -25,6 +25,11 @@ endif
 let $PATH=printf("%s:%s", s:bin_folder, $PATH)
 let $EDITOR=printf("%s/nmux", s:bin_folder)
 
+" Set NVIM socket path for nvr and other tools
+" Neovim 0.7.2+ uses $NVIM, older versions use $NVIM_LISTEN_ADDRESS
+let $NVIM = v:servername
+let $NVIM_LISTEN_ADDRESS = v:servername
+
 let s:nvr_warn_messages = []
 
 command! -nargs=0 NeomuxInstallNvr call s:InstallNvrBinary(1)
