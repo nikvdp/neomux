@@ -237,6 +237,7 @@ function! s:NeomuxMain()
     " Terminal naming settings (only relevant when tmux is enabled)
     if !exists('g:neomux_terminal_name_prefix') | let g:neomux_terminal_name_prefix = 'neomux://' | endif
     if !exists('g:neomux_rename_term_map') | let g:neomux_rename_term_map = '<Leader>nn' | endif
+    if !exists('g:neomux_buffer_picker_map') | let g:neomux_buffer_picker_map = '<Leader>nb' | endif
 
     command! Neomux call NeomuxTerm()
     
@@ -253,6 +254,9 @@ function! s:NeomuxMain()
     " Session save/restore commands
     command! -nargs=0 NeomuxSaveSession call NeomuxSaveSession()
     command! -nargs=? NeomuxRestoreSession call NeomuxRestoreSession(<f-args>)
+    
+    " Buffer picker command
+    command! -nargs=0 NeomuxBufferPicker call NeomuxBufferPicker()
 
     call NeomuxAddWinNumLabels()
 
@@ -319,6 +323,7 @@ function! s:NeomuxMain()
         execute printf('noremap %s :call NeomuxTmuxKillServer()<CR>:qa<CR>', g:neomux_tmux_quit_map)
         execute printf('noremap %s :call NeomuxTmuxReconnectPicker()<CR>', g:neomux_tmux_reconnect_map)
         execute printf('noremap %s :call NeomuxRenameTerminalPrompt()<CR>', g:neomux_rename_term_map)
+        execute printf('noremap %s :call NeomuxBufferPicker()<CR>', g:neomux_buffer_picker_map)
     endif
 endfunction
 
@@ -1708,6 +1713,95 @@ function! NeomuxAutosaveStatus() abort
         return printf('autosave: %ds', g:neomux_tmux_autosave_interval)
     else
         return 'autosave: off'
+    endif
+endfunction
+
+" ============================================================================
+" Buffer Picker Functions
+" ============================================================================
+
+function! s:GetNeomuxTerminalBuffers() abort
+    " Get a list of all neomux terminal buffers
+    " Returns list of dicts: [{'bufnr': N, 'name': 'terminal name', 'label': 'display label'}, ...]
+    let l:terminals = []
+    
+    for l:bufnr in range(1, bufnr('$'))
+        if !bufexists(l:bufnr)
+            continue
+        endif
+        
+        " Check if it's a neomux terminal (has tmux socket buffer var)
+        let l:socket = getbufvar(l:bufnr, 'neomux_tmux_socket', '')
+        if empty(l:socket)
+            continue
+        endif
+        
+        " Get terminal name
+        let l:term_name = getbufvar(l:bufnr, 'neomux_term_name', '')
+        if empty(l:term_name)
+            " Fall back to buffer name
+            let l:term_name = bufname(l:bufnr)
+        endif
+        
+        " Create display label: "name (bufnr)"
+        let l:label = printf('%s (%d)', l:term_name, l:bufnr)
+        
+        call add(l:terminals, {
+            \ 'bufnr': l:bufnr,
+            \ 'name': l:term_name,
+            \ 'label': l:label
+            \ })
+    endfor
+    
+    return l:terminals
+endfunction
+
+function! s:SwitchToBufferFromLabel(label) abort
+    " Parse buffer number from label and switch to it
+    " Label format: "name (bufnr)"
+    let l:match = matchstr(a:label, '(\zs\d\+\ze)$')
+    if empty(l:match)
+        echom 'neomux: Could not parse buffer number from selection'
+        return
+    endif
+    
+    let l:bufnr = str2nr(l:match)
+    if !bufexists(l:bufnr)
+        echom printf('neomux: Buffer %d no longer exists', l:bufnr)
+        return
+    endif
+    
+    execute 'buffer ' . l:bufnr
+endfunction
+
+function! NeomuxBufferPicker() abort
+    " Open fzf picker to select a neomux terminal buffer
+    " Switches the current window to the selected buffer
+    let l:terminals = s:GetNeomuxTerminalBuffers()
+    
+    if empty(l:terminals)
+        echom 'neomux: No neomux terminals found'
+        return
+    endif
+    
+    " Extract labels for picker
+    let l:labels = map(copy(l:terminals), {_, v -> v.label})
+    
+    " Check if fzf is available
+    if exists('*fzf#run')
+        call fzf#run({'source': l:labels, 'sink': function('s:SwitchToBufferFromLabel')})
+    else
+        " Fallback: show inputlist
+        let l:choices = ['Select terminal:']
+        let l:idx = 1
+        for l:label in l:labels
+            call add(l:choices, printf('%d. %s', l:idx, l:label))
+            let l:idx += 1
+        endfor
+        let l:choice = inputlist(l:choices)
+        if l:choice > 0 && l:choice <= len(l:labels)
+            call s:SwitchToBufferFromLabel(l:labels[l:choice - 1])
+        endif
     endif
 endfunction
 
