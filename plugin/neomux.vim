@@ -414,6 +414,10 @@ function! NeomuxTerm(...)
         let b:neomux_tmux_socket = g:neomux_tmux_socket_file
         let b:neomux_tmux_session = l:tmux_session_name
         
+        " Also set PATH in this session's environment for extra robustness
+        " This ensures PATH is correct even if tmux global env wasn't updated
+        call s:TmuxSetSessionEnvironment(b:neomux_tmux_socket, b:neomux_tmux_session)
+        
         " Generate default name and set neovim buffer name (handles uniqueness)
         let l:default_name = s:GenerateDefaultTerminalName()
         let l:name_result = s:SetNeomuxBufferName(l:bufnr, l:default_name)
@@ -573,15 +577,27 @@ function! s:TmuxGenerateSessionName() abort
 endfunction
 
 function! s:TmuxUpdateEnvironment(socket) abort
-    " Update tmux global environment with current neovim socket
-    " This allows shells to find the new neovim instance after reconnect/restore
+    " Update tmux global environment with current neovim socket and PATH
+    " This allows shells to find neovim and neomux tools after reconnect/restore
+    "
+    " IMPORTANT: tmux's server/client architecture means new shells inherit 
+    " environment from the tmux SERVER, not from the neovim terminal job.
+    " We must explicitly set PATH in tmux's global environment to ensure
+    " the neomux bin folder is available in all shells.
     let l:nvim_socket = s:TmuxGetNvimSocketPath()
     
-    " Update tmux environment variables
+    " Set PATH in tmux environment - this is critical!
+    " New tmux panes/windows inherit from the server environment, not the client
+    call system(printf("tmux -S %s set-environment -g PATH %s 2>/dev/null", shellescape(a:socket), shellescape($PATH)))
+    
+    " Update NVIM socket for remote commands (nvr, etc.)
     call system(printf("tmux -S %s set-environment -g NVIM %s 2>/dev/null", shellescape(a:socket), shellescape(l:nvim_socket)))
     call system(printf("tmux -S %s set-environment -g NVIM_LISTEN_ADDRESS %s 2>/dev/null", shellescape(a:socket), shellescape(l:nvim_socket)))
     
-    " Also update/create the RC file so shells can source it
+    " Set EDITOR so git, etc. use neomux's nmux command
+    call system(printf("tmux -S %s set-environment -g EDITOR %s 2>/dev/null", shellescape(a:socket), shellescape($EDITOR)))
+    
+    " Also update/create the RC file so shells can source it for helper functions
     let l:rc_file = printf('%s/%s.rc.sh', g:neomux_tmux_cache_dir, g:neomux_tmux_session)
     call s:WriteNeomuxRc(l:rc_file, l:nvim_socket)
     call system(printf("tmux -S %s set-environment -g NEOMUX_RC %s 2>/dev/null", shellescape(a:socket), shellescape(l:rc_file)))
@@ -629,6 +645,24 @@ function! s:WriteNeomuxRc(rc_file, nvim_socket) abort
         \ printf('source "%s/funcs.sh"', s:bin_folder),
         \ ]
     call writefile(l:lines, a:rc_file)
+endfunction
+
+function! s:TmuxSetSessionEnvironment(socket, session_name) abort
+    " Set environment variables in a specific tmux session
+    " This is called after creating a session to ensure PATH etc. are correct
+    " even if the global environment wasn't properly inherited
+    call system(printf("tmux -S %s set-environment -t %s PATH %s 2>/dev/null",
+                \ shellescape(a:socket), shellescape(a:session_name), shellescape($PATH)))
+    call system(printf("tmux -S %s set-environment -t %s NVIM %s 2>/dev/null",
+                \ shellescape(a:socket), shellescape(a:session_name), shellescape($NVIM)))
+    call system(printf("tmux -S %s set-environment -t %s NVIM_LISTEN_ADDRESS %s 2>/dev/null",
+                \ shellescape(a:socket), shellescape(a:session_name), shellescape($NVIM_LISTEN_ADDRESS)))
+    call system(printf("tmux -S %s set-environment -t %s EDITOR %s 2>/dev/null",
+                \ shellescape(a:socket), shellescape(a:session_name), shellescape($EDITOR)))
+    if exists('$NEOMUX_RC')
+        call system(printf("tmux -S %s set-environment -t %s NEOMUX_RC %s 2>/dev/null",
+                    \ shellescape(a:socket), shellescape(a:session_name), shellescape($NEOMUX_RC)))
+    endif
 endfunction
 
 function! s:TmuxGetNextSessionNum(socket) abort
@@ -960,6 +994,10 @@ endfunction
 function! s:TmuxStartTermAndConnect(socket_path, session, window_name) abort
     " Start a terminal and attach it to an existing tmux session
     " session is like 'nmux_0', 'nmux_1', etc.
+    
+    " Update session environment BEFORE attaching so the shell has correct PATH
+    " This is critical when reconnecting from a new neovim instance
+    call s:TmuxSetSessionEnvironment(a:socket_path, a:session)
     
     " Just attach directly to the session
     let l:attach_cmd = printf("tmux -S %s attach-session -t %s",
