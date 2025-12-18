@@ -1403,18 +1403,15 @@ function! s:EnsureLayoutTree(layout, state_count) abort
 endfunction
 
 function! s:CaptureTabState(tabnr) abort
-    " Capture the state of a single tab, including window layout and tab name
-    let l:return_winid = win_getid()
-    execute 'noautocmd tabnext ' . a:tabnr
-    
+    " Capture the state of a single tab, including window layout and tab name,
+    " without switching visible tabs.
     let l:states = []
     let l:meta = {'active': 0}
-    let l:layout = s:SerializeLayoutTree(winlayout(a:tabnr), l:states, win_getid(), l:meta)
+    let l:active_winid = win_getid(tabpagewinnr(a:tabnr), a:tabnr)
+    let l:layout = s:SerializeLayoutTree(winlayout(a:tabnr), l:states, l:active_winid, l:meta)
     
     " Capture tab name if set
     let l:tab_name = gettabvar(a:tabnr, 'tab_name', '')
-    
-    call s:GoToWindowSilently(l:return_winid)
     
     let l:result = {'layout': l:layout, 'states': l:states, 'active': l:meta.active}
     if !empty(l:tab_name)
