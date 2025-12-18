@@ -1405,7 +1405,7 @@ endfunction
 function! s:CaptureTabState(tabnr) abort
     " Capture the state of a single tab, including window layout and tab name
     let l:return_winid = win_getid()
-    execute 'tabnext ' . a:tabnr
+    execute 'noautocmd tabnext ' . a:tabnr
     
     let l:states = []
     let l:meta = {'active': 0}
@@ -1414,7 +1414,7 @@ function! s:CaptureTabState(tabnr) abort
     " Capture tab name if set
     let l:tab_name = gettabvar(a:tabnr, 'tab_name', '')
     
-    call win_gotoid(l:return_winid)
+    call s:GoToWindowSilently(l:return_winid)
     
     let l:result = {'layout': l:layout, 'states': l:states, 'active': l:meta.active}
     if !empty(l:tab_name)
@@ -1453,7 +1453,7 @@ endfunction
 function! s:BuildLayoutNode(node, winid, leaves) abort
     let l:type = get(a:node, 'type', 'leaf')
     if l:type ==# 'leaf'
-        call win_gotoid(a:winid)
+        call s:GoToWindowSilently(a:winid)
         call add(a:leaves, {'winid': a:winid, 'state_index': get(a:node, 'state_index', len(a:leaves))})
         return a:winid
     endif
@@ -1468,7 +1468,7 @@ function! s:BuildLayoutNode(node, winid, leaves) abort
         call s:BuildLayoutNode(l:children[l:idx], l:placeholders[l:idx], a:leaves)
     endfor
     
-    call win_gotoid(l:placeholders[0])
+    call s:GoToWindowSilently(l:placeholders[0])
     return l:placeholders[0]
 endfunction
 
@@ -1483,7 +1483,7 @@ function! s:EnsureChildWindows(anchor_winid, layout_type, count) abort
     let l:cmd = a:layout_type ==# 'row' ? 'rightbelow vsplit' : 'belowright split'
     
     for l:i in range(2, a:count)
-        call win_gotoid(l:current)
+        call s:GoToWindowSilently(l:current)
         execute l:cmd
         let l:current = win_getid()
         call add(l:windows, l:current)
@@ -1507,10 +1507,10 @@ function! s:RestoreTabLayout(tabstate) abort
     for l:leaf in l:leaves
         let l:index = get(l:leaf, 'state_index', -1)
         if l:index >= 0 && l:index < len(l:states)
-            call win_gotoid(l:leaf.winid)
+            call s:GoToWindowSilently(l:leaf.winid)
             call s:RestoreWindowContent(l:states[l:index])
         else
-            call win_gotoid(l:leaf.winid)
+            call s:GoToWindowSilently(l:leaf.winid)
             enew
         endif
     endfor
@@ -1523,13 +1523,13 @@ function! s:RestoreTabLayout(tabstate) abort
     let l:target = get(a:tabstate, 'active', 0)
     for l:leaf in l:leaves
         if get(l:leaf, 'state_index', -1) == l:target
-            call win_gotoid(l:leaf.winid)
+            call s:GoToWindowSilently(l:leaf.winid)
             return
         endif
     endfor
     
     if !empty(l:leaves)
-        call win_gotoid(l:leaves[0].winid)
+        call s:GoToWindowSilently(l:leaves[0].winid)
     endif
 endfunction
 
@@ -1598,7 +1598,7 @@ function! s:RestoreSessionState(state) abort
     
     " Switch to the originally active tab
     if has_key(a:state, 'current_tab') && a:state.current_tab > 0
-        execute 'tabnext ' . a:state.current_tab
+        execute 'noautocmd tabnext ' . a:state.current_tab
     endif
 endfunction
 
@@ -1700,6 +1700,13 @@ endfunction
 " ============================================================================
 " Autosave Functions
 " ============================================================================
+
+function! s:GoToWindowSilently(winid) abort
+    if a:winid <= 0
+        return
+    endif
+    execute 'noautocmd call win_gotoid(' . a:winid . ')'
+endfunction
 
 let s:autosave_timer_id = -1
 
