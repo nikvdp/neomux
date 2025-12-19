@@ -1,3 +1,7 @@
+# Unalias any conflicting names before defining functions
+# This prevents zsh errors when an alias exists with the same name
+unalias e s t vs vcd cdv vpwd vw vws 2>/dev/null || true
+
 get_nvim_socket() {
     # Get nvim socket - from tmux if available (survives reconnect), else env var
     if [ -n "$TMUX" ]; then
