@@ -18,7 +18,9 @@ get_nvim_socket() {
 
 nvr_cmd() {
     # Wrapper for nvr that gets fresh socket from tmux if available
-    export NVIM="$(get_nvim_socket)"
+    local socket
+    socket="$(get_nvim_socket)"
+    export NVIM="$socket"
     export NVIM_LISTEN_ADDRESS="$NVIM"
     nvr "$@"
 }
@@ -57,26 +59,27 @@ vbpaste() {
 
 vcd() {
     # switch *neovim's* working dir to $1
-    local dir="$(abspath "${1:-$PWD}")"
+    local dir
+    dir="$(abspath "${1:-$PWD}")"
     nvr_cmd -c "chdir $dir"
 }
 
 cdv() {
     # cd to the parent neovim's current working dir
-    cd "$(vpwd)"
+    cd "$(vpwd)" || return
 }
 
 vpwd() {
-  # print vim's current working dir (-1,-1) tells vim to return the global working dir
+    # print vim's current working dir (-1,-1) tells vim to return the global working dir
     nvr_cmd --remote-expr "getcwd(-1,-1)"
 }
 
 vim-window-print() {
     # vim-window-print: send contents of a window out to stdout
     local win="$1"
-    local oldwin="$(nvr_cmd --remote-expr 'tabpagewinnr(tabpagenr())')"
+    local oldwin
+    oldwin="$(nvr_cmd --remote-expr 'tabpagewinnr(tabpagenr())')"
     nvr_cmd -cc "${win}wincmd w" --remote-expr 'join(getline(1,"$"), "\n")' -c "${oldwin}wincmd w"
-    # nvr_cmd --remote-send a
 }
 
 # (vw from the command line) -- open a file in the window with the specified number
@@ -112,7 +115,7 @@ abspath() {
     fi
     echo "$in_path" | (
         IFS=/
-        read -a parr
+        read -r -a parr
         declare -a outp
         for i in "${parr[@]}"; do
             case "$i" in
@@ -124,12 +127,12 @@ abspath() {
                 if ((len == 0)); then
                     continue
                 else
-                    unset outp[$((len - 1))]
+                    unset "outp[$((len - 1))]"
                 fi
                 ;;
             *)
                 len=${#outp[@]}
-                outp[$len]="$i"
+                outp[len]="$i"
                 ;;
             esac
         done
