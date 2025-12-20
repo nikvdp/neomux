@@ -1626,6 +1626,7 @@ function! NeomuxSaveSession() abort
     
     let l:success = s:TmuxSaveSessionState(g:neomux_tmux_socket_file, l:json)
     if l:success
+        doautocmd User NeomuxSessionSaved
         let l:display = NeomuxSessionDisplayName()
         echom printf("neomux: Session '%s' saved. Restore with :NeomuxRestoreSession %s", l:display, g:neomux_tmux_session)
     else
@@ -1678,6 +1679,8 @@ function! NeomuxRestoreSession(...) abort
     " Build socket path from session name
     let l:socket = printf('%s/%s.tmux-socket', g:neomux_tmux_cache_dir, l:session_name)
     
+    doautocmd User NeomuxSessionRestoreStart
+
     " Load state from tmux
     let l:json = s:TmuxLoadSessionState(l:socket)
     if empty(l:json)
@@ -1695,6 +1698,7 @@ function! NeomuxRestoreSession(...) abort
     
     let l:display = NeomuxSessionDisplayName()
     echom printf('neomux: Session restored from tmux (%s)', l:display)
+    doautocmd User NeomuxSessionRestored
 endfunction
 
 function! s:RestoreSessionByLabel(label) abort
