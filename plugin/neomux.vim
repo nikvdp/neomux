@@ -1434,6 +1434,13 @@ function! s:CaptureSessionState() abort
     for l:tabnr in range(1, tabpagenr('$'))
         call add(l:state.tabs, s:CaptureTabState(l:tabnr))
     endfor
+
+    " Capture hidden neomux terminals not present in window layout
+    let l:seen = s:CollectNeomuxTermKeysFromState(l:state)
+    let l:hidden = s:CaptureHiddenNeomuxTerminals(l:seen)
+    if !empty(l:hidden)
+        let l:state.hidden_neomux_terminals = l:hidden
+    endif
     
     return l:state
 endfunction
@@ -1546,6 +1553,7 @@ function! s:RestoreWindowContent(state) abort
         " Reconnect to the tmux session
         if !empty(a:state.tmux_session)
             call s:TmuxStartTermAndConnect(g:neomux_tmux_socket_file, a:state.tmux_session, a:state.name)
+            call s:MarkNeomuxTerminalRestored(a:state.tmux_session, a:state.name)
         endif
     elseif a:state.type ==# 'terminal'
         " Regular terminal - just create an empty one (can't restore state)
@@ -1576,6 +1584,9 @@ function! s:RestoreSessionState(state) abort
     " Close all existing windows/tabs first
     silent! tabonly
     silent! only
+
+    " Track which neomux terminals are restored from visible layout
+    call s:ResetRestoredNeomuxTerminals()
     
     if !has_key(a:state, 'tabs') || empty(a:state.tabs)
         return
@@ -1597,6 +1608,9 @@ function! s:RestoreSessionState(state) abort
     if has_key(a:state, 'current_tab') && a:state.current_tab > 0
         execute 'noautocmd tabnext ' . a:state.current_tab
     endif
+
+    " Restore hidden neomux terminals in the background
+    call s:RestoreHiddenNeomuxTerminals(get(a:state, 'hidden_neomux_terminals', []))
 endfunction
 
 function! NeomuxSaveSession() abort
@@ -1703,6 +1717,98 @@ function! s:GoToWindowSilently(winid) abort
         return
     endif
     execute 'noautocmd call win_gotoid(' . a:winid . ')'
+endfunction
+
+function! s:NeomuxTerminalKey(tmux_session, name) abort
+    return a:tmux_session . '|' . a:name
+endfunction
+
+function! s:CollectNeomuxTermKeysFromState(state) abort
+    let l:keys = {}
+    if !has_key(a:state, 'tabs')
+        return l:keys
+    endif
+    for l:tab in a:state.tabs
+        let l:states = get(l:tab, 'states', [])
+        for l:entry in l:states
+            if get(l:entry, 'type', '') ==# 'neomux_terminal'
+                let l:session = get(l:entry, 'tmux_session', '')
+                let l:name = get(l:entry, 'name', '')
+                if !empty(l:session) && !empty(l:name)
+                    let l:keys[s:NeomuxTerminalKey(l:session, l:name)] = 1
+                endif
+            endif
+        endfor
+    endfor
+    return l:keys
+endfunction
+
+function! s:CaptureHiddenNeomuxTerminals(seen) abort
+    let l:hidden = []
+    for l:bufnr in range(1, bufnr('$'))
+        if !bufexists(l:bufnr)
+            continue
+        endif
+        let l:socket = getbufvar(l:bufnr, 'neomux_tmux_socket', '')
+        let l:session = getbufvar(l:bufnr, 'neomux_tmux_session', '')
+        if empty(l:socket) || empty(l:session)
+            continue
+        endif
+        let l:name = getbufvar(l:bufnr, 'neomux_term_name', '')
+        if empty(l:name)
+            let l:name = NeomuxTerminalName(l:bufnr)
+        endif
+        if empty(l:name)
+            continue
+        endif
+        let l:key = s:NeomuxTerminalKey(l:session, l:name)
+        if has_key(a:seen, l:key)
+            continue
+        endif
+        call add(l:hidden, {'tmux_session': l:session, 'name': l:name})
+        let a:seen[l:key] = 1
+    endfor
+    return l:hidden
+endfunction
+
+let s:restored_neomux_terminals = {}
+
+function! s:ResetRestoredNeomuxTerminals() abort
+    let s:restored_neomux_terminals = {}
+endfunction
+
+function! s:MarkNeomuxTerminalRestored(tmux_session, name) abort
+    if empty(a:tmux_session) || empty(a:name)
+        return
+    endif
+    let s:restored_neomux_terminals[s:NeomuxTerminalKey(a:tmux_session, a:name)] = 1
+endfunction
+
+function! s:RestoreHiddenNeomuxTerminals(terminals) abort
+    if empty(a:terminals)
+        return
+    endif
+    let l:return_tab = tabpagenr()
+    let l:orig_hidden = &hidden
+    set hidden
+    tabnew
+    let l:temp_tab = tabpagenr()
+    for l:term in a:terminals
+        let l:session = get(l:term, 'tmux_session', '')
+        let l:name = get(l:term, 'name', '')
+        if empty(l:session) || empty(l:name)
+            continue
+        endif
+        let l:key = s:NeomuxTerminalKey(l:session, l:name)
+        if has_key(s:restored_neomux_terminals, l:key)
+            continue
+        endif
+        call s:TmuxStartTermAndConnect(g:neomux_tmux_socket_file, l:session, l:name)
+        call s:MarkNeomuxTerminalRestored(l:session, l:name)
+    endfor
+    execute 'noautocmd tabnext ' . l:return_tab
+    execute 'noautocmd tabclose ' . l:temp_tab
+    let &hidden = l:orig_hidden
 endfunction
 
 let s:autosave_timer_id = -1
