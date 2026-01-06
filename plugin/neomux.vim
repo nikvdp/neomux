@@ -258,6 +258,9 @@ function! s:NeomuxMain()
     " Buffer picker command
     command! -nargs=0 NeomuxBufferPicker call NeomuxBufferPicker()
 
+    " External connect command
+    command! -nargs=0 NeomuxCopyConnectCommand call NeomuxCopyConnectCommand()
+
     call NeomuxAddWinNumLabels()
 
     " Make getting out of terminal windows work the same way it does for every
@@ -1930,15 +1933,15 @@ function! NeomuxBufferPicker() abort
     " Open fzf picker to select a neomux terminal buffer
     " Switches the current window to the selected buffer
     let l:terminals = s:GetNeomuxTerminalBuffers()
-    
+
     if empty(l:terminals)
         echom 'neomux: No neomux terminals found'
         return
     endif
-    
+
     " Extract labels for picker
     let l:labels = map(copy(l:terminals), {_, v -> v.label})
-    
+
     " Check if fzf is available
     if exists('*fzf#run')
         call fzf#run({'source': l:labels, 'sink': function('s:SwitchToBufferFromLabel')})
@@ -1955,6 +1958,44 @@ function! NeomuxBufferPicker() abort
             call s:SwitchToBufferFromLabel(l:labels[l:choice - 1])
         endif
     endif
+endfunction
+
+" ============================================================================
+" External Connect Command Functions
+" ============================================================================
+
+function! NeomuxGetConnectCommand(...) abort
+    " Get the tmux command to connect to a neomux terminal from outside
+    " Optional argument: buffer number (defaults to current buffer)
+    " Returns: the tmux command string, or empty string if not a neomux terminal
+    let l:bufnr = a:0 > 0 ? a:1 : bufnr('%')
+
+    let l:socket = getbufvar(l:bufnr, 'neomux_tmux_socket', '')
+    let l:session = getbufvar(l:bufnr, 'neomux_tmux_session', '')
+
+    if empty(l:socket) || empty(l:session)
+        return ''
+    endif
+
+    return printf('tmux -S %s attach-session -t %s',
+                \ shellescape(l:socket),
+                \ shellescape(l:session))
+endfunction
+
+function! NeomuxCopyConnectCommand(...) abort
+    " Copy the tmux connect command to clipboard
+    " Optional argument: buffer number (defaults to current buffer)
+    let l:bufnr = a:0 > 0 ? a:1 : bufnr('%')
+    let l:cmd = NeomuxGetConnectCommand(l:bufnr)
+
+    if empty(l:cmd)
+        echom 'neomux: Buffer is not a neomux tmux terminal'
+        return
+    endif
+
+    let @+ = l:cmd
+    let @" = l:cmd
+    echom 'Copied: ' . l:cmd
 endfunction
 
 
