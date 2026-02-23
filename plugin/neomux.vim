@@ -613,6 +613,25 @@ function! s:TmuxGenerateSessionName() abort
     return printf('%s_%s', l:base_name, l:random_word)
 endfunction
 
+function! s:TmuxSourceCommands(socket, commands) abort
+    " Execute multiple tmux commands in one source-file call
+    if empty(a:commands)
+        return 1
+    endif
+
+    let l:tmpfile = tempname()
+    call writefile(a:commands, l:tmpfile)
+
+    let l:cmd = printf('tmux -S %s source-file %s 2>/dev/null',
+                \ shellescape(a:socket),
+                \ shellescape(l:tmpfile))
+    call system(l:cmd)
+    let l:success = v:shell_error == 0
+
+    call delete(l:tmpfile)
+    return l:success
+endfunction
+
 function! s:TmuxUpdateEnvironment(socket) abort
     " Update tmux global environment with current neovim socket and PATH
     " This allows shells to find neovim and neomux tools after reconnect/restore
@@ -623,21 +642,19 @@ function! s:TmuxUpdateEnvironment(socket) abort
     " the neomux bin folder is available in all shells.
     let l:nvim_socket = s:TmuxGetNvimSocketPath()
     
-    " Set PATH in tmux environment - this is critical!
-    " New tmux panes/windows inherit from the server environment, not the client
-    call system(printf("tmux -S %s set-environment -g PATH %s 2>/dev/null", shellescape(a:socket), shellescape($PATH)))
-    
-    " Update NVIM socket for remote commands (nvr, etc.)
-    call system(printf("tmux -S %s set-environment -g NVIM %s 2>/dev/null", shellescape(a:socket), shellescape(l:nvim_socket)))
-    call system(printf("tmux -S %s set-environment -g NVIM_LISTEN_ADDRESS %s 2>/dev/null", shellescape(a:socket), shellescape(l:nvim_socket)))
-    
-    " Set EDITOR so git, etc. use neomux's nmux command
-    call system(printf("tmux -S %s set-environment -g EDITOR %s 2>/dev/null", shellescape(a:socket), shellescape($EDITOR)))
-    
     " Also update/create the RC file so shells can source it for helper functions
     let l:rc_file = printf('%s/%s.rc.sh', g:neomux_tmux_cache_dir, g:neomux_tmux_session)
     call s:WriteNeomuxRc(l:rc_file, l:nvim_socket)
-    call system(printf("tmux -S %s set-environment -g NEOMUX_RC %s 2>/dev/null", shellescape(a:socket), shellescape(l:rc_file)))
+
+    " Set tmux environment vars in one batch to reduce shell/process overhead
+    let l:commands = [
+                \ printf('set-environment -g PATH %s', shellescape($PATH)),
+                \ printf('set-environment -g NVIM %s', shellescape(l:nvim_socket)),
+                \ printf('set-environment -g NVIM_LISTEN_ADDRESS %s', shellescape(l:nvim_socket)),
+                \ printf('set-environment -g EDITOR %s', shellescape($EDITOR)),
+                \ printf('set-environment -g NEOMUX_RC %s', shellescape(l:rc_file)),
+                \ ]
+    call s:TmuxSourceCommands(a:socket, l:commands)
     
     return l:rc_file
 endfunction
@@ -688,18 +705,16 @@ function! s:TmuxSetSessionEnvironment(socket, session_name) abort
     " Set environment variables in a specific tmux session
     " This is called after creating a session to ensure PATH etc. are correct
     " even if the global environment wasn't properly inherited
-    call system(printf("tmux -S %s set-environment -t %s PATH %s 2>/dev/null",
-                \ shellescape(a:socket), shellescape(a:session_name), shellescape($PATH)))
-    call system(printf("tmux -S %s set-environment -t %s NVIM %s 2>/dev/null",
-                \ shellescape(a:socket), shellescape(a:session_name), shellescape($NVIM)))
-    call system(printf("tmux -S %s set-environment -t %s NVIM_LISTEN_ADDRESS %s 2>/dev/null",
-                \ shellescape(a:socket), shellescape(a:session_name), shellescape($NVIM_LISTEN_ADDRESS)))
-    call system(printf("tmux -S %s set-environment -t %s EDITOR %s 2>/dev/null",
-                \ shellescape(a:socket), shellescape(a:session_name), shellescape($EDITOR)))
+    let l:commands = [
+                \ printf('set-environment -t %s PATH %s', shellescape(a:session_name), shellescape($PATH)),
+                \ printf('set-environment -t %s NVIM %s', shellescape(a:session_name), shellescape($NVIM)),
+                \ printf('set-environment -t %s NVIM_LISTEN_ADDRESS %s', shellescape(a:session_name), shellescape($NVIM_LISTEN_ADDRESS)),
+                \ printf('set-environment -t %s EDITOR %s', shellescape(a:session_name), shellescape($EDITOR)),
+                \ ]
     if exists('$NEOMUX_RC')
-        call system(printf("tmux -S %s set-environment -t %s NEOMUX_RC %s 2>/dev/null",
-                    \ shellescape(a:socket), shellescape(a:session_name), shellescape($NEOMUX_RC)))
+        call add(l:commands, printf('set-environment -t %s NEOMUX_RC %s', shellescape(a:session_name), shellescape($NEOMUX_RC)))
     endif
+    call s:TmuxSourceCommands(a:socket, l:commands)
 endfunction
 
 function! s:TmuxGetNextSessionNum(socket) abort
