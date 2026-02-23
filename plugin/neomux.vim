@@ -233,6 +233,10 @@ function! s:NeomuxMain()
     if !exists('g:neomux_tmux_reconnect_map') | let g:neomux_tmux_reconnect_map = '<Leader>nr' | endif
     " Autosave interval in seconds (0 to disable, default 30)
     if !exists('g:neomux_tmux_autosave_interval') | let g:neomux_tmux_autosave_interval = 30 | endif
+
+    if g:neomux_enable_tmux
+        call s:TmuxCleanDeadSocketsOnStartup()
+    endif
     
     " Terminal naming settings (only relevant when tmux is enabled)
     if !exists('g:neomux_terminal_name_prefix') | let g:neomux_terminal_name_prefix = 'neomux://' | endif
@@ -559,6 +563,36 @@ function! s:TmuxEnsureCacheDir() abort
     " Ensure the cache directory exists
     if !isdirectory(g:neomux_tmux_cache_dir)
         call mkdir(g:neomux_tmux_cache_dir, 'p')
+    endif
+endfunction
+
+function! s:TmuxSocketIsAlive(socket) abort
+    " Return 1 when a tmux server responds on this socket
+    if empty(a:socket) || empty(glob(a:socket))
+        return 0
+    endif
+
+    let l:cmd = printf('tmux -S %s has-session 2>/dev/null', shellescape(a:socket))
+    call system(l:cmd)
+    return v:shell_error == 0
+endfunction
+
+function! s:TmuxCleanDeadSocketsOnStartup() abort
+    " Remove stale neomux sockets that no longer have a live tmux server
+    call s:TmuxEnsureCacheDir()
+
+    let l:removed = 0
+    for l:socket in globpath(g:neomux_tmux_cache_dir, '*.tmux-socket', 0, 1)
+        if s:TmuxSocketIsAlive(l:socket)
+            continue
+        endif
+        if delete(l:socket) == 0
+            let l:removed += 1
+        endif
+    endfor
+
+    if l:removed > 0
+        echom printf('neomux: Removed %d stale tmux socket(s)', l:removed)
     endif
 endfunction
 
