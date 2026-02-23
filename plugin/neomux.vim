@@ -1084,6 +1084,14 @@ function! NeomuxTmuxReconnect(session_name) abort
     let g:neomux_tmux_session = a:session_name
     let l:socket = printf('%s/%s.tmux-socket', g:neomux_tmux_cache_dir, a:session_name)
     let g:neomux_tmux_socket_file = l:socket
+
+    if !s:TmuxSocketIsAlive(l:socket)
+        if !empty(glob(l:socket))
+            call delete(l:socket)
+        endif
+        echom printf("neomux: tmux socket for '%s' is not active", a:session_name)
+        return
+    endif
     
     " Update tmux environment with new neovim socket so old shells can find us
     call s:TmuxUpdateEnvironment(l:socket)
@@ -1730,6 +1738,14 @@ function! NeomuxRestoreSession(...) abort
     
     " Build socket path from session name
     let l:socket = printf('%s/%s.tmux-socket', g:neomux_tmux_cache_dir, l:session_name)
+
+    if !s:TmuxSocketIsAlive(l:socket)
+        if !empty(glob(l:socket))
+            call delete(l:socket)
+        endif
+        echom printf("neomux: tmux socket for '%s' is not active", l:session_name)
+        return
+    endif
     
     doautocmd User NeomuxSessionRestoreStart
 
