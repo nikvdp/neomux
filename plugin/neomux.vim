@@ -1853,9 +1853,12 @@ function! s:RestoreHiddenNeomuxTerminals(terminals) abort
 endfunction
 
 let s:autosave_timer_id = -1
+let s:autosave_autocmds_enabled = 0
 
 function! s:AutosaveCallback(timer_id) abort
-    " Timer callback for autosaving session state
+    " Debounce callback for autosaving session state
+    let s:autosave_timer_id = -1
+
     " Only save if we have an active tmux session
     if !exists('g:neomux_tmux_socket_file') || empty(g:neomux_tmux_socket_file)
         return
@@ -1867,29 +1870,44 @@ function! s:AutosaveCallback(timer_id) abort
     call s:TmuxSaveSessionState(g:neomux_tmux_socket_file, l:json)
 endfunction
 
-function! s:StartAutosaveTimer() abort
-    " Start the autosave timer if configured
-    " Called when first neomux terminal is created
-    
-    " Don't start if autosave is disabled
+function! s:ScheduleAutosave() abort
+    " Queue an autosave after a short debounce window
     if g:neomux_tmux_autosave_interval <= 0
         return
     endif
-    
-    " Don't start if timer is already running
-    if s:autosave_timer_id >= 0
+
+    if !exists('g:neomux_tmux_socket_file') || empty(g:neomux_tmux_socket_file)
         return
     endif
+
+    if s:autosave_timer_id >= 0
+        call timer_stop(s:autosave_timer_id)
+    endif
+
+    let l:delay_ms = g:neomux_tmux_autosave_interval * 1000
+    let s:autosave_timer_id = timer_start(l:delay_ms, function('s:AutosaveCallback'))
+endfunction
+
+function! s:StartAutosaveTimer() abort
+    " Enable event-driven autosave triggers if configured
     
-    " Convert seconds to milliseconds
-    let l:interval_ms = g:neomux_tmux_autosave_interval * 1000
-    
-    " Start repeating timer
-    let s:autosave_timer_id = timer_start(l:interval_ms, function('s:AutosaveCallback'), {'repeat': -1})
+    if g:neomux_tmux_autosave_interval <= 0
+        return
+    endif
+
+    if !s:autosave_autocmds_enabled
+        augroup neomux_autosave
+            autocmd!
+            autocmd WinEnter,BufEnter,TabEnter * call <SID>ScheduleAutosave()
+        augroup END
+        let s:autosave_autocmds_enabled = 1
+    endif
+
+    call s:ScheduleAutosave()
 endfunction
 
 function! s:StopAutosaveTimer() abort
-    " Stop the autosave timer
+    " Stop any scheduled autosave
     if s:autosave_timer_id >= 0
         call timer_stop(s:autosave_timer_id)
         let s:autosave_timer_id = -1
@@ -1898,8 +1916,11 @@ endfunction
 
 function! NeomuxAutosaveStatus() abort
     " Return the current autosave status for debugging/statusline
-    if s:autosave_timer_id >= 0
-        return printf('autosave: %ds', g:neomux_tmux_autosave_interval)
+    if g:neomux_tmux_autosave_interval <= 0
+        return 'autosave: off'
+    endif
+    if s:autosave_autocmds_enabled
+        return printf('autosave: event+%ds', g:neomux_tmux_autosave_interval)
     else
         return 'autosave: off'
     endif
