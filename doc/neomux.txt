@@ -425,6 +425,10 @@ Tmux configuration options: ~
 - 'g:neomux_tmux_session_name' - Default: auto-generated. Override the
   auto-generated session name.
 
+- 'g:neomux_tmux_autosave_interval' - Default: '30'. Debounce window in
+  seconds for event-driven autosave on window/buffer/tab enter. Set to '0'
+  to disable autosave.
+
 Tmux keybindings (only active when tmux is enabled): ~
 
 - 'g:neomux_tmux_kill_map' - Default: '<Leader>nk'. Kill the tmux server.
@@ -471,6 +475,12 @@ from a new neovim instance:
 1. Start neovim and enable tmux mode ('let g:neomux_enable_tmux = 1')
 2. Press '<Leader>nr' or run ':NeomuxTmuxReconnect'
 3. Select the session to reconnect to from the picker
+
+When tmux mode starts, neomux removes stale socket files in the tmux cache
+directory that are no longer backed by a live tmux server.
+
+If a selected session socket is missing or no longer active, reconnect/restore
+will fail fast with a message instead of attempting to attach to a dead server.
 
 After reconnecting, old shells need to update their neovim socket reference.
 The reconnect command stores this in the '@n' register:
