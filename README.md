@@ -153,7 +153,7 @@ for some interesting possibilities.
 
 The `vwp` (vim-window-print) command does the reverse of the `vw` command. It
 takes the contents of any vim window and streams it out to standard out. When
-you combine this with your shell's [process substition][process-substition]
+you combine this with your shell's [process substitution][process-substitution]
 functionality, you can do some interesting things such as interactively working
 on a bash script without having to first write it to a file. Check out vid above
 for more details
