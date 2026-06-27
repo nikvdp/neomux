@@ -206,7 +206,7 @@ function! s:NeomuxMain()
     if !exists('g:neomux_start_term_vsplit_map') | let g:neomux_start_term_vsplit_map = '<C-w>T' | endif
     if !exists('g:neomux_hitenter_fix') | let g:neomux_hitenter_fix = 0 | endif
     if !exists('g:neomux_winjump_map_prefix') | let g:neomux_winjump_map_prefix = "<C-w>" | endif
-    " neomux_enable_set_win_to_cur_pos is experimental, only enable if requested 
+    " neomux_enable_set_win_to_cur_pos is experimental, only enable if requested
     if exists('g:neomux_enable_set_win_to_cur_pos')
         if !exists('g:neomux_set_win_to_cur_pos_prefix')
             let g:neomux_set_win_to_cur_pos_prefix = "<Leader>vp"
@@ -237,14 +237,14 @@ function! s:NeomuxMain()
     if g:neomux_enable_tmux
         call s:TmuxCleanDeadSocketsOnStartup()
     endif
-    
+
     " Terminal naming settings (only relevant when tmux is enabled)
     if !exists('g:neomux_terminal_name_prefix') | let g:neomux_terminal_name_prefix = 'neomux://' | endif
     if !exists('g:neomux_rename_term_map') | let g:neomux_rename_term_map = '<Leader>nn' | endif
     if !exists('g:neomux_buffer_picker_map') | let g:neomux_buffer_picker_map = '<Leader>nb' | endif
 
     command! Neomux call NeomuxTerm()
-    
+
     " Tmux integration commands (always available, but only useful when tmux enabled)
     command! NeomuxTmuxKill call NeomuxTmuxKillServer()
     command! NeomuxTmuxReconnect call NeomuxTmuxReconnectPicker()
@@ -254,11 +254,11 @@ function! s:NeomuxMain()
     command! -nargs=0 NeomuxRenameTerminalPrompt call NeomuxRenameTerminalPrompt()
     command! -nargs=1 NeomuxRenameSession call NeomuxRenameSession(<q-args>)
     command! -nargs=0 NeomuxRenameSessionPrompt call NeomuxRenameSessionPrompt()
-    
+
     " Session save/restore commands
     command! -nargs=0 NeomuxSaveSession call NeomuxSaveSession()
     command! -nargs=? NeomuxRestoreSession call NeomuxRestoreSession(<f-args>)
-    
+
     " Buffer picker command
     command! -nargs=0 NeomuxBufferPicker call NeomuxBufferPicker()
 
@@ -323,7 +323,7 @@ function! s:NeomuxMain()
 
     " term size-fix map
     execute printf('noremap %s <C-\><C-n><Esc>:call NeomuxResizeWindow()<CR>', g:neomux_term_sizefix_map)
-    
+
     " Tmux integration keymaps (only set when tmux is enabled)
     if g:neomux_enable_tmux
         execute printf('noremap %s :call NeomuxTmuxKillServer()<CR>', g:neomux_tmux_kill_map)
@@ -337,11 +337,11 @@ endfunction
 function! NeomuxSetWinToCurrentPos(tgt_win)
     let l:cur_pos = { "buf": bufnr("%"), "line": line("."), "col": col(".") }
     stopinsert
-    execute printf("%swincmd w", a:tgt_win) 
+    execute printf("%swincmd w", a:tgt_win)
     execute printf(":b!%s", l:cur_pos.buf)
 
     execute l:cur_pos.line
-    normal 0 
+    normal 0
     execute printf("normal %sl", l:cur_pos.col - 1)
 endfunction
 
@@ -362,7 +362,7 @@ function! NeomuxPasteBuffer(...)
     stopinsert
     execute printf(":b!%s", s:yanked_buffers[l:register].buf)
     execute s:yanked_buffers[l:register].line
-    normal 0 
+    normal 0
     execute printf("normal %sl", s:yanked_buffers[l:register].col - 1)
     echo printf("Pasted buffer #%s from register '%s'", s:yanked_buffers[l:register].buf, l:register)
 endfunction
@@ -377,7 +377,7 @@ endfunction
 function! NeomuxTerm(...)
     " Start a neomux terminal
     " If g:neomux_enable_tmux is set, wraps the shell in a persistent tmux session
-    
+
     if a:0 > 0
         let l:term_cmd = a:1
     endif
@@ -392,11 +392,11 @@ function! NeomuxTerm(...)
         else
             " Set up session variables (socket path, etc.)
             call s:TmuxEnsureSessionVars()
-            
+
             " Get next session number and create session name
             let l:session_num = s:TmuxGetNextSessionNum(g:neomux_tmux_socket_file)
             let l:tmux_session_name = 'nmux_' . l:session_num
-            
+
             " Create the tmux command
             let l:term_cmd = s:TmuxCreateSession(g:neomux_tmux_socket_file, l:tmux_session_name)
             let l:is_tmux_term = 1
@@ -414,29 +414,29 @@ function! NeomuxTerm(...)
             term!
         endif
     endif
-    
+
     " Set up buffer-local variables and naming for tmux terminals
     if l:is_tmux_term
         let l:bufnr = bufnr('%')
         let b:neomux_tmux_socket = g:neomux_tmux_socket_file
         let b:neomux_tmux_session = l:tmux_session_name
-        
+
         " Also set PATH in this session's environment for extra robustness
         " This ensures PATH is correct even if tmux global env wasn't updated
         call s:TmuxSetSessionEnvironment(b:neomux_tmux_socket, b:neomux_tmux_session)
-        
+
         " Generate default name and set neovim buffer name (handles uniqueness)
         let l:default_name = s:GenerateDefaultTerminalName()
         let l:name_result = s:SetNeomuxBufferName(l:bufnr, l:default_name)
-        
+
         " Store the final name (may have uniqueness suffix)
         let b:neomux_term_name = l:name_result.final
-        
+
         " Set tmux window name with retry (tmux may not be ready immediately)
         " Use the final name so tmux and neovim stay in sync
         " Retry up to 10 times (1 second total) to handle slow tmux startup
         call s:TmuxSetWindowNameWithRetry(b:neomux_tmux_socket, b:neomux_tmux_session, l:name_result.final, 10)
-        
+
         " Start autosave timer if not already running
         call s:StartAutosaveTimer()
     endif
@@ -601,11 +601,11 @@ function! s:TmuxGenerateSessionName() abort
     if !empty(g:neomux_tmux_session_name)
         return g:neomux_tmux_session_name
     endif
-    
+
     if exists('g:neomux_tmux_session') && !empty(g:neomux_tmux_session)
         return g:neomux_tmux_session
     endif
-    
+
     " Generate: <basename_of_root_dir>_<random_word>
     let l:root_dir = s:TmuxGetRootDir()
     let l:base_name = fnamemodify(l:root_dir, ':t')
@@ -636,12 +636,12 @@ function! s:TmuxUpdateEnvironment(socket) abort
     " Update tmux global environment with current neovim socket and PATH
     " This allows shells to find neovim and neomux tools after reconnect/restore
     "
-    " IMPORTANT: tmux's server/client architecture means new shells inherit 
+    " IMPORTANT: tmux's server/client architecture means new shells inherit
     " environment from the tmux SERVER, not from the neovim terminal job.
     " We must explicitly set PATH in tmux's global environment to ensure
     " the neomux bin folder is available in all shells.
     let l:nvim_socket = s:TmuxGetNvimSocketPath()
-    
+
     " Also update/create the RC file so shells can source it for helper functions
     let l:rc_file = printf('%s/%s.rc.sh', g:neomux_tmux_cache_dir, g:neomux_tmux_session)
     call s:WriteNeomuxRc(l:rc_file, l:nvim_socket)
@@ -655,33 +655,33 @@ function! s:TmuxUpdateEnvironment(socket) abort
                 \ printf('set-environment -g NEOMUX_RC %s', shellescape(l:rc_file)),
                 \ ]
     call s:TmuxSourceCommands(a:socket, l:commands)
-    
+
     return l:rc_file
 endfunction
 
 function! s:TmuxEnsureSessionVars() abort
     " Ensure global session variables are set up
     " Call this before any tmux operations
-    
+
     call s:TmuxEnsureCacheDir()
-    
+
     " Set up session name if not already set
     if !exists('g:neomux_tmux_session') || empty(g:neomux_tmux_session)
         let g:neomux_tmux_session = s:TmuxGenerateSessionName()
     endif
-    
+
     " Derive socket path from session name
     let l:socket_file = printf('%s/%s.tmux-socket', g:neomux_tmux_cache_dir, g:neomux_tmux_session)
     let g:neomux_tmux_socket_file = l:socket_file
-    
+
     " Ensure NVIM_LISTEN_ADDRESS is set for older tools
     if has("nvim-0.7.2")
         let $NVIM_LISTEN_ADDRESS = v:servername
     endif
-    
+
     " Update tmux environment and get the RC file path
     let l:rc_file = s:TmuxUpdateEnvironment(l:socket_file)
-    
+
     " Set NEOMUX_RC in our environment so it propagates to tmux
     let $NEOMUX_RC = l:rc_file
 endfunction
@@ -722,7 +722,7 @@ function! s:TmuxGetNextSessionNum(socket) abort
     " Sessions are named nmux_0, nmux_1, etc.
     let l:cmd = printf("tmux -S %s list-sessions -F '#{session_name}' 2>/dev/null", shellescape(a:socket))
     let l:output = system(l:cmd)
-    
+
     let l:max_num = -1
     for l:line in split(l:output, "\n")
         " Match nmux_N pattern (but not nmux_N_NMUX_* grouped sessions)
@@ -734,7 +734,7 @@ function! s:TmuxGetNextSessionNum(socket) abort
             endif
         endif
     endfor
-    
+
     return l:max_num + 1
 endfunction
 
@@ -742,13 +742,13 @@ function! s:TmuxCreateSession(socket, session_name) abort
     " Create a new tmux session and attach to it
     " Returns the command to run in :term
     let l:shell = len($SHELL) > 0 ? $SHELL : '/bin/sh'
-    
+
     " Build the tmux command
     let l:cmd = printf("tmux -S %s new-session -s %s %s",
                 \ shellescape(a:socket),
                 \ shellescape(a:session_name),
                 \ shellescape(l:shell))
-    
+
     return l:cmd
 endfunction
 
@@ -773,17 +773,17 @@ function! s:TmuxGetDisplayName(socket) abort
     let l:cmd = printf("tmux -S %s show-environment -g NEOMUX_DISPLAY_NAME 2>/dev/null",
                 \ shellescape(a:socket))
     let l:output = trim(system(l:cmd))
-    
+
     if v:shell_error || empty(l:output)
         return ''
     endif
-    
+
     " Output is "NEOMUX_DISPLAY_NAME=<name>", extract the value
     let l:idx = stridx(l:output, '=')
     if l:idx < 0
         return ''
     endif
-    
+
     return l:output[l:idx + 1:]
 endfunction
 
@@ -800,12 +800,12 @@ function! NeomuxSessionDisplayName() abort
     if !exists('g:neomux_tmux_socket_file') || empty(g:neomux_tmux_socket_file)
         return ''
     endif
-    
+
     let l:display = s:TmuxGetDisplayName(g:neomux_tmux_socket_file)
     if !empty(l:display)
         return l:display
     endif
-    
+
     " Fall back to internal session name
     return exists('g:neomux_tmux_session') ? g:neomux_tmux_session : ''
 endfunction
@@ -874,7 +874,7 @@ function! s:GetSessionDisplayLabel() abort
             return l:display
         endif
     endif
-    
+
     " Fall back to extracting word from internal session name (e.g., 'neomux_Arum' -> 'Arum')
     if exists('g:neomux_tmux_session') && !empty(g:neomux_tmux_session)
         let l:parts = split(g:neomux_tmux_session, '_')
@@ -897,10 +897,10 @@ function! s:SetNeomuxBufferName(bufnr, name) abort
     else
         let l:display_name = a:name
     endif
-    
+
     let l:fullname = 'neomux:' . l:display_name
     let l:final_name = a:name
-    
+
     " Check for existing buffer with same name
     let l:existing = bufnr(l:fullname)
     if l:existing != -1 && l:existing != a:bufnr
@@ -912,7 +912,7 @@ function! s:SetNeomuxBufferName(bufnr, name) abort
         let l:fullname = l:fullname . '<' . l:idx . '>'
         let l:final_name = a:name . '<' . l:idx . '>'
     endif
-    
+
     call nvim_buf_set_name(a:bufnr, l:fullname)
     return {'base': a:name, 'full': l:fullname, 'final': l:final_name}
 endfunction
@@ -921,20 +921,20 @@ function! NeomuxTerminalName(...) abort
     " Get the terminal name for a neomux buffer
     " Optional argument: buffer number (defaults to current buffer)
     let l:bufnr = a:0 > 0 ? a:1 : bufnr('%')
-    
+
     " Check if it's a neomux terminal
     let l:name = getbufvar(l:bufnr, 'neomux_term_name', '')
     if !empty(l:name)
         return l:name
     endif
-    
+
     " Try to get from tmux if buffer-local var not set
     let l:socket = getbufvar(l:bufnr, 'neomux_tmux_socket', '')
     let l:session = getbufvar(l:bufnr, 'neomux_tmux_session', '')
     if !empty(l:socket) && !empty(l:session)
         return s:TmuxGetWindowName(l:socket, l:session)
     endif
-    
+
     return ''
 endfunction
 
@@ -950,11 +950,11 @@ function! NeomuxTmuxListSessions() abort
     " List all active neomux tmux sessions by finding open sockets
     " Returns a list of internal session names, sorted by most recently modified first
     let l:sessions = []
-    
+
     " Use lsof to find tmux processes with neomux sockets
     let l:lsof_cmd = printf("lsof -w -P -n -c tmux 2>/dev/null | grep '%s' | grep tmux-socket", g:neomux_tmux_cache_dir)
     let l:output = system(l:lsof_cmd)
-    
+
     " Extract session names from socket paths
     for l:line in split(l:output, "\n")
         " Match the session name from path like: /path/to/cache/<session>.tmux-socket
@@ -963,7 +963,7 @@ function! NeomuxTmuxListSessions() abort
             call add(l:sessions, l:match)
         endif
     endfor
-    
+
     " Sort by socket file modification time (most recent first)
     " Build list of [session, mtime] pairs
     let l:with_mtime = []
@@ -972,10 +972,10 @@ function! NeomuxTmuxListSessions() abort
         let l:mtime = getftime(l:socket_path)
         call add(l:with_mtime, [l:sess, l:mtime])
     endfor
-    
+
     " Sort by mtime descending (most recent first)
     call sort(l:with_mtime, {a, b -> b[1] - a[1]})
-    
+
     " Extract just the session names
     return map(l:with_mtime, {_, v -> v[0]})
 endfunction
@@ -984,7 +984,7 @@ function! s:FormatSessionPickerLabel(internal_name) abort
     " Get a display label for a session picker: "display_name (internal)" or just "internal"
     let l:socket = printf('%s/%s.tmux-socket', g:neomux_tmux_cache_dir, a:internal_name)
     let l:display = s:TmuxGetDisplayName(l:socket)
-    
+
     if !empty(l:display) && l:display !=# a:internal_name
         return printf('%s (%s)', l:display, a:internal_name)
     endif
@@ -1013,14 +1013,14 @@ function! s:TmuxListMainSessions(socket_path) abort
     " List all main neomux sessions (nmux_N pattern, excluding _NMUX_ grouped ones)
     " Returns a list of dicts: [{'session': 'nmux_0', 'window_name': 'name'}, ...]
     let l:sep = '|||'
-    let l:cmd = printf("tmux -S %s list-sessions -F '#{session_name}%s#{window_name}' 2>/dev/null", 
+    let l:cmd = printf("tmux -S %s list-sessions -F '#{session_name}%s#{window_name}' 2>/dev/null",
                 \ shellescape(a:socket_path), l:sep)
     let l:output = system(l:cmd)
-    
+
     if v:shell_error
         return []
     endif
-    
+
     let l:sessions = []
     for l:line in split(l:output, "\n")
         let l:parts = split(l:line, l:sep, 1)
@@ -1033,7 +1033,7 @@ function! s:TmuxListMainSessions(socket_path) abort
             endif
         endif
     endfor
-    
+
     return l:sessions
 endfunction
 
@@ -1046,21 +1046,21 @@ endfunction
 function! s:TmuxStartTermAndConnect(socket_path, session, window_name) abort
     " Start a terminal and attach it to an existing tmux session
     " session is like 'nmux_0', 'nmux_1', etc.
-    
+
     " Update session environment BEFORE attaching so the shell has correct PATH
     " This is critical when reconnecting from a new neovim instance
     call s:TmuxSetSessionEnvironment(a:socket_path, a:session)
-    
+
     " Just attach directly to the session
     let l:attach_cmd = printf("tmux -S %s attach-session -t %s",
                 \ shellescape(a:socket_path),
                 \ shellescape(a:session))
     execute 'term ' . l:attach_cmd
-    
+
     " Set up buffer-local variables for the reconnected terminal
     let b:neomux_tmux_socket = a:socket_path
     let b:neomux_tmux_session = a:session
-    
+
     " Set buffer name from the provided window name
     if !empty(a:window_name)
         let l:name_result = s:SetNeomuxBufferName(bufnr('%'), a:window_name)
@@ -1071,7 +1071,7 @@ endfunction
 function! NeomuxTmuxReconnect(session_name) abort
     " Reconnect to an existing neomux tmux session
     " session_name is the neomux session (e.g., 'nik_colpotomy'), not the tmux session
-    
+
     " Clear existing session state
     if exists('g:neomux_tmux_socket_file')
         unlet g:neomux_tmux_socket_file
@@ -1079,7 +1079,7 @@ function! NeomuxTmuxReconnect(session_name) abort
     if exists('g:neomux_tmux_session')
         unlet g:neomux_tmux_session
     endif
-    
+
     " Set the new session name and derive socket path
     let g:neomux_tmux_session = a:session_name
     let l:socket = printf('%s/%s.tmux-socket', g:neomux_tmux_cache_dir, a:session_name)
@@ -1092,18 +1092,18 @@ function! NeomuxTmuxReconnect(session_name) abort
         echom printf("neomux: tmux socket for '%s' is not active", a:session_name)
         return
     endif
-    
+
     " Update tmux environment with new neovim socket so old shells can find us
     call s:TmuxUpdateEnvironment(l:socket)
-    
+
     " List all main sessions (nmux_0, nmux_1, etc.)
     let l:sessions = s:TmuxListMainSessions(l:socket)
-    
+
     if empty(l:sessions)
         echom printf("neomux: No terminals found in '%s'", a:session_name)
         return
     endif
-    
+
     " Open a split for each tmux session, restoring names
     let l:first = 1
     for l:sess in l:sessions
@@ -1113,10 +1113,10 @@ function! NeomuxTmuxReconnect(session_name) abort
         let l:first = 0
         call s:TmuxStartTermAndConnect(l:socket, l:sess.session, l:sess.window_name)
     endfor
-    
+
     " Start autosave timer after reconnect
     call s:StartAutosaveTimer()
-    
+
     echom printf("neomux: Reconnected to '%s' (%d terminals)", a:session_name, len(l:sessions))
 endfunction
 
@@ -1129,12 +1129,12 @@ endfunction
 function! NeomuxTmuxReconnectPicker() abort
     " Open fzf picker to select a session to reconnect to
     let l:labels = NeomuxTmuxListSessionsForPicker()
-    
+
     if empty(l:labels)
         echom 'neomux: No active tmux sessions found'
         return
     endif
-    
+
     " Check if fzf is available
     if exists('*fzf#run')
         call fzf#run({'source': l:labels, 'sink': function('s:ReconnectFromLabel')})
@@ -1159,7 +1159,7 @@ function! NeomuxTmuxKillServer() abort
         echom 'neomux: No active tmux session'
         return
     endif
-    
+
     let l:cmd = printf("tmux -S %s kill-server 2>/dev/null", shellescape(g:neomux_tmux_socket_file))
     call system(l:cmd)
     if v:shell_error
@@ -1175,11 +1175,11 @@ function! NeomuxTmuxClean() abort
         echom 'neomux: No active tmux session'
         return
     endif
-    
+
     let l:socket = g:neomux_tmux_socket_file
     let l:cmd = printf("tmux -S %s list-sessions -F '#{session_name}' 2>/dev/null", shellescape(l:socket))
     let l:output = system(l:cmd)
-    
+
     let l:count = 0
     for l:sess in split(l:output, "\n")
         " Kill any session with _NMUX_ in the name (old grouped sessions)
@@ -1189,40 +1189,40 @@ function! NeomuxTmuxClean() abort
             let l:count += 1
         endif
     endfor
-    
+
     echom printf('neomux: Cleaned %d orphaned session(s)', l:count)
 endfunction
 
 function! NeomuxRenameTerminal(name) abort
     " Rename the current neomux terminal
     " Updates both tmux window name and neovim buffer name
-    
+
     " Check if this is a neomux tmux terminal
     if !exists('b:neomux_tmux_socket') || !exists('b:neomux_tmux_session')
         echom 'neomux: Current buffer is not a neomux tmux terminal'
         return
     endif
-    
+
     let l:name = trim(a:name)
     if empty(l:name)
         echom 'neomux: Name cannot be empty'
         return
     endif
-    
+
     " Update neovim buffer name first (may add uniqueness suffix)
     let l:name_result = s:SetNeomuxBufferName(bufnr('%'), l:name)
     let l:final_name = l:name_result.final
-    
+
     " Update tmux window name (source of truth) with final name
     let l:success = s:TmuxSetWindowName(b:neomux_tmux_socket, b:neomux_tmux_session, l:final_name)
     if !l:success
         echom 'neomux: Failed to set tmux window name'
         return
     endif
-    
+
     " Update buffer-local variable with final name
     let b:neomux_term_name = l:final_name
-    
+
     echom printf("neomux: Renamed terminal to '%s'", l:final_name)
 endfunction
 
@@ -1232,7 +1232,7 @@ function! NeomuxRenameTerminalPrompt() abort
         echom 'neomux: Current buffer is not a neomux tmux terminal'
         return
     endif
-    
+
     let l:current = exists('b:neomux_term_name') ? b:neomux_term_name : ''
     let l:name = input('New terminal name: ', l:current)
     if !empty(l:name)
@@ -1244,27 +1244,27 @@ function! NeomuxRenameSession(name) abort
     " Rename the current neomux session (sets display name)
     " The internal name (used for socket files) remains unchanged
     " Also updates all neomux terminal buffer names to reflect the new session name
-    
+
     if !exists('g:neomux_tmux_socket_file') || empty(g:neomux_tmux_socket_file)
         echom 'neomux: No active neomux session'
         return
     endif
-    
+
     let l:name = trim(a:name)
     if empty(l:name)
         echom 'neomux: Name cannot be empty'
         return
     endif
-    
+
     let l:success = s:TmuxSetDisplayName(g:neomux_tmux_socket_file, l:name)
     if !l:success
         echom 'neomux: Failed to rename session'
         return
     endif
-    
+
     " Update all neomux terminal buffer names to use new session label
     call s:RefreshAllTerminalBufferNames()
-    
+
     echom printf("neomux: Session renamed to '%s'", l:name)
 endfunction
 
@@ -1296,7 +1296,7 @@ function! NeomuxRenameSessionPrompt() abort
         echom 'neomux: No active neomux session'
         return
     endif
-    
+
     let l:current = NeomuxSessionDisplayName()
     let l:name = input('New session name: ', l:current)
     if !empty(l:name)
@@ -1307,12 +1307,12 @@ endfunction
 function! NeomuxAddWinNumLabels()
     " Put window number labels in statusline
 
-    if &runtimepath =~ 'airline' && exists('*airline#parts#define') 
+    if &runtimepath =~ 'airline' && exists('*airline#parts#define')
         " There appears to be a bug in airline's terminal extension that causes the
         " window numbers to disappear from terminal windows when the windows lose
         " focus. I've opened an issue with airline here:
         "   https://github.com/vim-airline/vim-airline/issues/2249
-        " In the meantime, workaround by disabling airline's terminal extension 
+        " In the meantime, workaround by disabling airline's terminal extension
         let g:airline#extensions#term#enabled = 0
 
         function! NeomuxAirlineHelper(...)
@@ -1323,7 +1323,7 @@ function! NeomuxAddWinNumLabels()
 
     elseif &runtimepath =~ 'lualine'
         " TODO: consider automatically updating lualine to include neomux
-        " window 
+        " window
     else
         if &statusline !~ g:neomux_win_num_status
             let &statusline = &statusline . g:neomux_win_num_status
@@ -1349,17 +1349,17 @@ function! s:TmuxLoadSessionState(socket) abort
     let l:cmd = printf("tmux -S %s show-environment -g NEOMUX_SESSION_STATE 2>/dev/null",
                 \ shellescape(a:socket))
     let l:output = trim(system(l:cmd))
-    
+
     if v:shell_error || empty(l:output)
         return ''
     endif
-    
+
     " Output is "NEOMUX_SESSION_STATE=<json>", extract the value
     let l:idx = stridx(l:output, '=')
     if l:idx < 0
         return ''
     endif
-    
+
     return l:output[l:idx + 1:]
 endfunction
 
@@ -1368,14 +1368,14 @@ function! s:CaptureWindowState(winid) abort
     let l:bufnr = winbufnr(a:winid)
     let l:buftype = getbufvar(l:bufnr, '&buftype')
     let l:bufname = bufname(l:bufnr)
-    
+
     let l:state = {}
-    
+
     if l:buftype ==# 'terminal'
         " It's a terminal - check if it's a neomux terminal
         let l:tmux_session = getbufvar(l:bufnr, 'neomux_tmux_session', '')
         let l:term_name = getbufvar(l:bufnr, 'neomux_term_name', '')
-        
+
         if !empty(l:tmux_session)
             let l:state.type = 'neomux_terminal'
             let l:state.tmux_session = l:tmux_session
@@ -1398,14 +1398,14 @@ function! s:CaptureWindowState(winid) abort
         let l:state.buftype = l:buftype
         let l:state.bufname = l:bufname
     endif
-    
+
     return l:state
 endfunction
 
 function! s:SerializeLayoutTree(layout, states, active_winid, meta) abort
     " Convert raw winlayout() data into a stable dictionary tree
     let l:type = a:layout[0]
-    
+
     if l:type ==# 'leaf'
         let l:winid = a:layout[1]
         call add(a:states, s:CaptureWindowState(l:winid))
@@ -1415,19 +1415,19 @@ function! s:SerializeLayoutTree(layout, states, active_winid, meta) abort
         endif
         return {'type': 'leaf', 'state_index': l:index}
     endif
-    
+
     let l:children = []
     for l:child in a:layout[1]
         call add(l:children, s:SerializeLayoutTree(l:child, a:states, a:active_winid, a:meta))
     endfor
-    
+
     return {'type': l:type, 'children': l:children}
 endfunction
 
 function! s:ConvertLegacyLayout(node, cursor) abort
     " Convert the legacy list-based layout into the new dictionary shape
     let l:type = a:node[0]
-    
+
     if l:type ==# 'leaf'
         let l:index = a:cursor.next
         if a:cursor.limit > 0 && l:index >= a:cursor.limit
@@ -1436,12 +1436,12 @@ function! s:ConvertLegacyLayout(node, cursor) abort
         let a:cursor.next += 1
         return {'type': 'leaf', 'state_index': max([0, l:index])}
     endif
-    
+
     let l:children = []
     for l:child in a:node[1]
         call add(l:children, s:ConvertLegacyLayout(l:child, a:cursor))
     endfor
-    
+
     return {'type': l:type, 'children': l:children}
 endfunction
 
@@ -1453,11 +1453,11 @@ function! s:EnsureLayoutTree(layout, state_count) abort
         endif
         return a:layout
     endif
-    
+
     if type(a:layout) != type([])
         return {'type': 'leaf', 'state_index': 0}
     endif
-    
+
     let l:cursor = {'next': 0, 'limit': a:state_count}
     return s:ConvertLegacyLayout(a:layout, l:cursor)
 endfunction
@@ -1469,10 +1469,10 @@ function! s:CaptureTabState(tabnr) abort
     let l:meta = {'active': 0}
     let l:active_winid = win_getid(tabpagewinnr(a:tabnr), a:tabnr)
     let l:layout = s:SerializeLayoutTree(winlayout(a:tabnr), l:states, l:active_winid, l:meta)
-    
+
     " Capture tab name if set
     let l:tab_name = gettabvar(a:tabnr, 'tab_name', '')
-    
+
     let l:result = {'layout': l:layout, 'states': l:states, 'active': l:meta.active}
     if !empty(l:tab_name)
         let l:result.tab_name = l:tab_name
@@ -1489,7 +1489,7 @@ function! s:CaptureSessionState() abort
         \ 'current_tab': tabpagenr(),
         \ 'tabs': []
         \ }
-    
+
     " Capture each tab
     for l:tabnr in range(1, tabpagenr('$'))
         call add(l:state.tabs, s:CaptureTabState(l:tabnr))
@@ -1501,7 +1501,7 @@ function! s:CaptureSessionState() abort
     if !empty(l:hidden)
         let l:state.hidden_neomux_terminals = l:hidden
     endif
-    
+
     return l:state
 endfunction
 
@@ -1510,7 +1510,7 @@ function! s:CreateSplitStructure(layout, leaves) abort
     if empty(a:layout)
         return 0
     endif
-    
+
     return s:BuildLayoutNode(a:layout, win_getid(), a:leaves)
 endfunction
 
@@ -1521,17 +1521,17 @@ function! s:BuildLayoutNode(node, winid, leaves) abort
         call add(a:leaves, {'winid': a:winid, 'state_index': get(a:node, 'state_index', len(a:leaves))})
         return a:winid
     endif
-    
+
     let l:children = get(a:node, 'children', [])
     if empty(l:children)
         return s:BuildLayoutNode({'type': 'leaf', 'state_index': get(a:node, 'state_index', len(a:leaves))}, a:winid, a:leaves)
     endif
-    
+
     let l:placeholders = s:EnsureChildWindows(a:winid, l:type, len(l:children))
     for l:idx in range(0, len(l:children) - 1)
         call s:BuildLayoutNode(l:children[l:idx], l:placeholders[l:idx], a:leaves)
     endfor
-    
+
     call s:GoToWindowSilently(l:placeholders[0])
     return l:placeholders[0]
 endfunction
@@ -1541,18 +1541,18 @@ function! s:EnsureChildWindows(anchor_winid, layout_type, count) abort
     if a:count <= 1
         return [a:anchor_winid]
     endif
-    
+
     let l:windows = [a:anchor_winid]
     let l:current = a:anchor_winid
     let l:cmd = a:layout_type ==# 'row' ? 'rightbelow vsplit' : 'belowright split'
-    
+
     for l:i in range(2, a:count)
         call s:GoToWindowSilently(l:current)
         execute l:cmd
         let l:current = win_getid()
         call add(l:windows, l:current)
     endfor
-    
+
     " Ensure the list is exactly count long
     return l:windows
 endfunction
@@ -1562,12 +1562,12 @@ function! s:RestoreTabLayout(tabstate) abort
     if !has_key(a:tabstate, 'layout')
         return
     endif
-    
+
     let l:states = get(a:tabstate, 'states', [])
     let l:layout = s:EnsureLayoutTree(a:tabstate.layout, len(l:states))
     let l:leaves = []
     call s:CreateSplitStructure(l:layout, l:leaves)
-    
+
     for l:leaf in l:leaves
         let l:index = get(l:leaf, 'state_index', -1)
         if l:index >= 0 && l:index < len(l:states)
@@ -1578,12 +1578,12 @@ function! s:RestoreTabLayout(tabstate) abort
             enew
         endif
     endfor
-    
+
     " Restore tab name if present
     if has_key(a:tabstate, 'tab_name') && !empty(a:tabstate.tab_name)
         let t:tab_name = a:tabstate.tab_name
     endif
-    
+
     let l:target = get(a:tabstate, 'active', 0)
     for l:leaf in l:leaves
         if get(l:leaf, 'state_index', -1) == l:target
@@ -1591,7 +1591,7 @@ function! s:RestoreTabLayout(tabstate) abort
             return
         endif
     endfor
-    
+
     if !empty(l:leaves)
         call s:GoToWindowSilently(l:leaves[0].winid)
     endif
@@ -1599,7 +1599,7 @@ endfunction
 
 function! s:RestoreWindowContent(state) abort
     " Restore the content of a window based on saved state
-    
+
     if a:state.type ==# 'file'
         " Open the file
         if filereadable(a:state.path)
@@ -1626,32 +1626,32 @@ endfunction
 
 function! s:RestoreSessionState(state) abort
     " Restore the entire session state
-    
+
     " Set up neomux session variables
     if !empty(a:state.neomux_session)
         let g:neomux_tmux_session = a:state.neomux_session
         let g:neomux_tmux_socket_file = printf('%s/%s.tmux-socket', g:neomux_tmux_cache_dir, a:state.neomux_session)
-        
+
         " Update tmux environment with new neovim socket so restored shells can find us
         call s:TmuxUpdateEnvironment(g:neomux_tmux_socket_file)
     endif
-    
+
     " Change to saved working directory
     if !empty(a:state.cwd) && isdirectory(a:state.cwd)
         execute 'cd ' . fnameescape(a:state.cwd)
     endif
-    
+
     " Close all existing windows/tabs first
     silent! tabonly
     silent! only
 
     " Track which neomux terminals are restored from visible layout
     call s:ResetRestoredNeomuxTerminals()
-    
+
     if !has_key(a:state, 'tabs') || empty(a:state.tabs)
         return
     endif
-    
+
     " Restore each tab
     let l:first_tab = 1
     for l:tabstate in a:state.tabs
@@ -1659,11 +1659,11 @@ function! s:RestoreSessionState(state) abort
             tabnew
         endif
         let l:first_tab = 0
-        
+
         " Restore the layout for this tab using two-pass approach
         call s:RestoreTabLayout(l:tabstate)
     endfor
-    
+
     " Switch to the originally active tab
     if has_key(a:state, 'current_tab') && a:state.current_tab > 0
         execute 'noautocmd tabnext ' . a:state.current_tab
@@ -1675,15 +1675,15 @@ endfunction
 
 function! NeomuxSaveSession() abort
     " Save the current session state to tmux
-    
+
     if !exists('g:neomux_tmux_socket_file') || empty(g:neomux_tmux_socket_file)
         echom 'neomux: No active neomux session. Start a terminal first.'
         return
     endif
-    
+
     let l:state = s:CaptureSessionState()
     let l:json = json_encode(l:state)
-    
+
     let l:success = s:TmuxSaveSessionState(g:neomux_tmux_socket_file, l:json)
     if l:success
         doautocmd User NeomuxSessionSaved
@@ -1697,9 +1697,9 @@ endfunction
 function! NeomuxRestoreSession(...) abort
     " Restore a saved session state from tmux
     " Optional argument: session name (defaults to picker if multiple)
-    
+
     let l:session_name = ''
-    
+
     if a:0 > 0
         " Session name provided as argument (could be display label or internal name)
         let l:session_name = s:ParseSessionFromLabel(a:1)
@@ -1710,7 +1710,7 @@ function! NeomuxRestoreSession(...) abort
             echom 'neomux: No active tmux sessions found'
             return
         endif
-        
+
         " If only one session, use it
         if len(l:labels) == 1
             let l:session_name = s:ParseSessionFromLabel(l:labels[0])
@@ -1735,7 +1735,7 @@ function! NeomuxRestoreSession(...) abort
             endif
         endif
     endif
-    
+
     " Build socket path from session name
     let l:socket = printf('%s/%s.tmux-socket', g:neomux_tmux_cache_dir, l:session_name)
 
@@ -1746,7 +1746,7 @@ function! NeomuxRestoreSession(...) abort
         echom printf("neomux: tmux socket for '%s' is not active", l:session_name)
         return
     endif
-    
+
     doautocmd User NeomuxSessionRestoreStart
 
     " Load state from tmux
@@ -1757,13 +1757,13 @@ function! NeomuxRestoreSession(...) abort
         call NeomuxTmuxReconnect(l:session_name)
         return
     endif
-    
+
     let l:state = json_decode(l:json)
     call s:RestoreSessionState(l:state)
-    
+
     " Start autosave timer after restore
     call s:StartAutosaveTimer()
-    
+
     let l:display = NeomuxSessionDisplayName()
     echom printf('neomux: Session restored from tmux (%s)', l:display)
     doautocmd User NeomuxSessionRestored
@@ -1894,7 +1894,7 @@ function! s:AutosaveCallback(timer_id) abort
     if !exists('g:neomux_tmux_socket_file') || empty(g:neomux_tmux_socket_file)
         return
     endif
-    
+
     " Silently save without echoing messages
     let l:state = s:CaptureSessionState()
     let l:json = json_encode(l:state)
@@ -1921,7 +1921,7 @@ endfunction
 
 function! s:StartAutosaveTimer() abort
     " Enable event-driven autosave triggers if configured
-    
+
     if g:neomux_tmux_autosave_interval <= 0
         return
     endif
@@ -1965,35 +1965,35 @@ function! s:GetNeomuxTerminalBuffers() abort
     " Get a list of all neomux terminal buffers
     " Returns list of dicts: [{'bufnr': N, 'name': 'terminal name', 'label': 'display label'}, ...]
     let l:terminals = []
-    
+
     for l:bufnr in range(1, bufnr('$'))
         if !bufexists(l:bufnr)
             continue
         endif
-        
+
         " Check if it's a neomux terminal (has tmux socket buffer var)
         let l:socket = getbufvar(l:bufnr, 'neomux_tmux_socket', '')
         if empty(l:socket)
             continue
         endif
-        
+
         " Get terminal name
         let l:term_name = getbufvar(l:bufnr, 'neomux_term_name', '')
         if empty(l:term_name)
             " Fall back to buffer name
             let l:term_name = bufname(l:bufnr)
         endif
-        
+
         " Create display label: "name (bufnr)"
         let l:label = printf('%s (%d)', l:term_name, l:bufnr)
-        
+
         call add(l:terminals, {
             \ 'bufnr': l:bufnr,
             \ 'name': l:term_name,
             \ 'label': l:label
             \ })
     endfor
-    
+
     return l:terminals
 endfunction
 
@@ -2005,13 +2005,13 @@ function! s:SwitchToBufferFromLabel(label) abort
         echom 'neomux: Could not parse buffer number from selection'
         return
     endif
-    
+
     let l:bufnr = str2nr(l:match)
     if !bufexists(l:bufnr)
         echom printf('neomux: Buffer %d no longer exists', l:bufnr)
         return
     endif
-    
+
     execute 'buffer ' . l:bufnr
 endfunction
 
