@@ -367,12 +367,19 @@ Without tmux, your shell sessions die when neovim exits. With tmux integration:
 #### How it works
 
 When tmux integration is enabled, each `:Neomux` terminal runs inside its own
-tmux session. All these sessions are grouped under a single neomux "session"
-(named like `myproject_wonderland`). The session name shows in your statusline.
+tmux session named like `nmux_0`, `nmux_1`, etc. All those terminal sessions
+belong to one neomux session (named like `myproject_wonderland`) and one tmux
+server socket under `g:neomux_tmux_cache_dir`. The session name shows in your
+statusline.
+
+Neomux stores terminal names in tmux window names, writes reconnect helper RC
+files beside the tmux socket, and saves layout JSON in the tmux environment as
+`NEOMUX_SESSION_STATE`.
 
 If neovim exits (crash or normal quit), the tmux sessions keep running in the
-background. Start neovim again and use `:NeomuxTmuxReconnect` to pick up where
-you left off - all your terminals, in the same layout, with command history intact.
+background. Start neovim again and use `:NeomuxRestoreSession` to restore your
+saved layout and reconnect terminals. Use `:NeomuxTmuxReconnect` only when you
+want to attach the running terminals without recreating the saved window layout.
 
 #### Setup
 
@@ -405,7 +412,7 @@ you left them.
 
 - `g:neomux_enable_tmux` - Default: `0`. Set to `1` to enable tmux integration.
 - `g:neomux_tmux_cache_dir` - Default: `~/.cache/neomux`. Directory for tmux
-  sockets and session files.
+  socket files and generated shell RC files.
 - `g:neomux_tmux_session_name` - Default: auto-generated. Override the
   auto-generated session name.
 - `g:neomux_tmux_autosave_interval` - Default: `30`. Debounce window in seconds
@@ -485,9 +492,9 @@ full layout back.
 
 #### Refreshing stale shell environments
 
-If you have an existing shell inside a neomux tmux session that was started before
-neomux (or has a stale `$NVIM` environment variable), you can refresh it by sourcing
-the neomux RC file. Add this alias to your `.bashrc` or `.zshrc`:
+If you have an existing shell inside a neomux tmux session that was started
+before neomux wrote its helper environment, you can refresh it by sourcing the
+neomux RC file. Add this alias to your `.bashrc` or `.zshrc`:
 
 ```bash
 alias nxr='source $(tmux show-environment -g NEOMUX_RC 2>/dev/null | cut -d= -f2)'
@@ -508,9 +515,10 @@ Just restart neovim and run:
 :NeomuxRestoreSession
 ```
 
-Your layout, terminals, and command history all come back. The shells automatically
-reconnect to the new neovim instance - no manual steps needed. After reconnecting,
-run `nxr` in each shell to refresh the neomux environment variables.
+Your layout, terminals, and command history all come back. The helper functions
+prefer the current `$NVIM` socket and can fall back to tmux's updated socket
+after restore/reconnect. If an old shell is missing helper functions or PATH
+updates, run `nxr` in that shell to source the current neomux RC file.
 
 #### Tmux public functions
 

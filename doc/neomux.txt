@@ -413,16 +413,21 @@ To enable tmux integration, add this to your 'init.vim':
   let g:neomux_enable_tmux = 1
 <
 When enabled, ':Neomux' will:
-1. Create a tmux session with a unique name (based on git repo + random word)
-2. Store the tmux socket in '~/.cache/neomux/'
-3. Set up environment variables so shell helpers continue to work
+1. Create one neomux session with a unique name (based on git repo + random
+   word) and one tmux server socket.
+2. Create each ':Neomux' terminal as a tmux session named like 'nmux_0',
+   'nmux_1', etc. on that socket.
+3. Store tmux socket files and generated shell RC files in
+   'g:neomux_tmux_cache_dir'.
+4. Save layout JSON in the tmux environment as 'NEOMUX_SESSION_STATE'.
+5. Set up environment variables so shell helpers continue to work.
 
 Tmux configuration options: ~
 
 - 'g:neomux_enable_tmux' - Default: '0'. Set to '1' to enable tmux integration.
 
 - 'g:neomux_tmux_cache_dir' - Default: '~/.cache/neomux'. Directory for tmux
-  sockets and session files.
+  socket files and generated shell RC files.
 
 - 'g:neomux_tmux_session_name' - Default: auto-generated. Override the
   auto-generated session name.
@@ -457,9 +462,15 @@ tmux and neovim, with tmux as the source of truth:
 
 Tmux commands: ~
 
+- ':NeomuxRestoreSession [name]' - Restore the saved layout and reconnect
+  terminals.
+
+- ':NeomuxSaveSession' - Manually save the current layout to tmux.
+
 - ':NeomuxTmuxKill' - Kill the tmux server for the current session.
 
-- ':NeomuxTmuxReconnect' - Open a picker to reconnect to orphaned sessions.
+- ':NeomuxTmuxReconnect' - Open a picker to reconnect terminals without
+  restoring the saved layout.
 
 - ':NeomuxTmuxReconnectTo <name>' - Reconnect to a specific session by name.
 
@@ -472,12 +483,15 @@ Tmux commands: ~
 
 Reconnecting to sessions: ~
 
-If neovim exits but your tmux sessions are still running, you can reconnect
-from a new neovim instance:
+If neovim exits but your tmux sessions are still running, you can restore from
+a new neovim instance:
 
 1. Start neovim and enable tmux mode ('let g:neomux_enable_tmux = 1')
-2. Press '<Leader>nr' or run ':NeomuxTmuxReconnect'
-3. Select the session to reconnect to from the picker
+2. Run ':NeomuxRestoreSession'
+3. Select the session to restore from the picker
+
+Use ':NeomuxTmuxReconnect' only when you want to attach the running terminals
+without recreating the saved window layout.
 
 When tmux mode starts, neomux removes stale socket files in the tmux cache
 directory that are no longer backed by a live tmux server.
@@ -485,11 +499,13 @@ directory that are no longer backed by a live tmux server.
 If a selected session socket is missing or no longer active, reconnect/restore
 will fail fast with a message instead of attempting to attach to a dead server.
 
-After reconnecting, old shells need to update their neovim socket reference.
-The reconnect command stores this in the '@n' register:
+After restore or reconnect, helper commands prefer the current '$NVIM' socket
+and can fall back to tmux's updated socket when the local socket is stale. If an
+old shell is missing helper functions or PATH updates, source the current RC
+file:
 >
   # Run this in old shells to update their connection
-  eval $(tmux show-env -g NEOMUX_RC) && source $NEOMUX_RC
+  source $(tmux show-environment -g NEOMUX_RC 2>/dev/null | cut -d= -f2)
 <
 Tmux public functions: ~
 
