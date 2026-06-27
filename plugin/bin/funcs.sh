@@ -3,21 +3,28 @@
 unalias e s t vs vcd cdv vpwd vw vws 2>/dev/null || true
 
 get_nvim_socket() {
-    # Get nvim socket - from tmux if available (survives reconnect), else env var
+    # Prefer the current shell's Neovim socket. Fall back to tmux only when the
+    # local environment is missing or stale after a reconnect.
+    local current_socket="${NVIM:-$NVIM_LISTEN_ADDRESS}"
+    if [ -n "$current_socket" ] && [ -S "$current_socket" ]; then
+        echo "$current_socket"
+        return
+    fi
+
     if [ -n "$TMUX" ]; then
         local socket
         socket=$(tmux show-environment -g NVIM 2>/dev/null | cut -d= -f2)
-        if [ -n "$socket" ]; then
+        if [ -n "$socket" ] && [ -S "$socket" ]; then
             echo "$socket"
             return
         fi
     fi
-    # Fallback to env var
-    echo "${NVIM:-$NVIM_LISTEN_ADDRESS}"
+
+    echo "$current_socket"
 }
 
 nvr_cmd() {
-    # Wrapper for nvr that gets fresh socket from tmux if available
+    # Wrapper for nvr that resolves the best available Neovim socket.
     local socket
     socket="$(get_nvim_socket)"
     export NVIM="$socket"
