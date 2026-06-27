@@ -446,7 +446,7 @@ function! WindowNumber()
     return tabpagewinnr(tabpagenr())
 endfunction
 
-function! NeomuxStatusSession()
+function! NeomuxStatusSession() abort
     " Return session name for statusline (only when tmux is enabled)
     if exists('g:neomux_tmux_session') && !empty(g:neomux_tmux_session)
         return ' S:[' . g:neomux_tmux_session . ']'
