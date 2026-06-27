@@ -26,7 +26,8 @@ Contents ~
  7. Customization                                        |neomux-customization|
    1. Key bindings:
    2. Other config                                        |neomux-other-config|
-   3. Miscellanea / troubleshooting        |neomux-miscellanea-troubleshooting|
+   3. Tmux integration                              |neomux-tmux-integration|
+   4. Miscellanea / troubleshooting        |neomux-miscellanea-troubleshooting|
  8. References                                              |neomux-references|
 
 ===============================================================================
@@ -69,7 +70,9 @@ Installation ~
 1. Install neovim.
 2. Install this plugin into neovim via your favorite plugin manager (vim-
    plug [3] is a good place to start)
-3. (Optional, for speed) install neovim-remote [1].
+3. Neomux will automatically download nvr-go [11] on first run. For offline
+   installation or manual setup, install neovim-remote [1] with
+   'pip install neovim-remote' or download nvr-go from releases.
 
 ===============================================================================
                                                                  *neomux-usage*
@@ -228,7 +231,7 @@ To put data in a register pipe it in via stdin:
 And get it out with 'vp':
 >
   $ vp a
-  This is what's in register a. 
+  This is what's in register a.
 <
 All vim register semantics are preserved, so you can append to the contents of
 a register by capitalizing the register name:
@@ -393,9 +396,138 @@ to configure your plugin manager to load neomux _after_ the airline plugin.**
   'g:neomux_no_exit_term_map' to '1'.
 
 - 'g:neomux_hitenter_fix' - There is an issue [10] when using 'cmdheight=0' that
-  causes hit-enter confirmations in neovim when any of the 
+  causes hit-enter confirmations in neovim when any of the
   'g:neomux_start_term_*map' keys are executed. Until the issue is fixed, you
   can work around it by setting 'g:neomux_hitenter_fix' to '1'.
+
+-------------------------------------------------------------------------------
+                                                        *neomux-tmux-integration*
+Tmux integration ~
+
+Neomux can optionally wrap terminals in persistent tmux sessions. This allows
+your shell sessions to survive neovim restarts, and lets you reconnect to
+orphaned sessions from new neovim instances.
+
+To enable tmux integration, add this to your 'init.vim':
+>
+  let g:neomux_enable_tmux = 1
+<
+When enabled, ':Neomux' will:
+1. Create one neomux session with a unique name (based on git repo + random
+   word) and one tmux server socket.
+2. Create each ':Neomux' terminal as a tmux session named like 'nmux_0',
+   'nmux_1', etc. on that socket.
+3. Store tmux socket files and generated shell RC files in
+   'g:neomux_tmux_cache_dir'.
+4. Save layout JSON in the tmux environment as 'NEOMUX_SESSION_STATE'.
+5. Set up environment variables so shell helpers continue to work.
+
+Tmux configuration options: ~
+
+- 'g:neomux_enable_tmux' - Default: '0'. Set to '1' to enable tmux integration.
+
+- 'g:neomux_tmux_cache_dir' - Default: '~/.cache/neomux'. Directory for tmux
+  socket files and generated shell RC files.
+
+- 'g:neomux_tmux_session_name' - Default: auto-generated. Override the
+  auto-generated session name.
+
+- 'g:neomux_tmux_autosave_interval' - Default: '30'. Debounce window in
+  seconds for event-driven autosave on window/buffer/tab enter. Set to '0'
+  to disable autosave.
+
+Tmux keybindings (only active when tmux is enabled): ~
+
+- 'g:neomux_tmux_kill_map' - Default: '<Leader>nk'. Kill the tmux server.
+
+- 'g:neomux_tmux_quit_map' - Default: '<Leader>nq'. Kill tmux server and quit
+  vim.
+
+- 'g:neomux_tmux_reconnect_map' - Default: '<Leader>nr'. Open reconnect picker.
+
+- 'g:neomux_rename_term_map' - Default: '<Leader>nn'. Rename current terminal.
+
+- 'g:neomux_terminal_name_prefix' - Default: 'neomux://'. Prefix for neovim
+  buffer names.
+
+Terminal naming: ~
+
+When tmux integration is enabled, neomux synchronizes terminal names between
+tmux and neovim, with tmux as the source of truth:
+
+- New terminals are automatically named based on the current directory
+- Names are stored in tmux window names and reflected in neovim buffer names
+- Use ':NeomuxRenameTerminal <name>' or '<Leader>nn' to rename terminals
+- Names are preserved and restored when reconnecting to orphaned sessions
+
+Tmux commands: ~
+
+- ':NeomuxRestoreSession [name]' - Restore the saved layout and reconnect
+  terminals.
+
+- ':NeomuxSaveSession' - Manually save the current layout to tmux.
+
+- ':NeomuxTmuxKill' - Kill the tmux server for the current session.
+
+- ':NeomuxTmuxReconnect' - Open a picker to reconnect terminals without
+  restoring the saved layout.
+
+- ':NeomuxTmuxReconnectTo <name>' - Reconnect to a specific session by name.
+
+- ':NeomuxTmuxClean' - Clean up reattached session markers.
+
+- ':NeomuxRenameTerminal <name>' - Rename the current terminal (syncs tmux and
+  neovim).
+
+- ':NeomuxRenameTerminalPrompt' - Prompt for a new terminal name.
+
+Reconnecting to sessions: ~
+
+If neovim exits but your tmux sessions are still running, you can restore from
+a new neovim instance:
+
+1. Start neovim and enable tmux mode ('let g:neomux_enable_tmux = 1')
+2. Run ':NeomuxRestoreSession'
+3. Select the session to restore from the picker
+
+Use ':NeomuxTmuxReconnect' only when you want to attach the running terminals
+without recreating the saved window layout.
+
+When tmux mode starts, neomux removes stale socket files in the tmux cache
+directory that are no longer backed by a live tmux server.
+
+If a selected session socket is missing or no longer active, reconnect/restore
+will fail fast with a message instead of attempting to attach to a dead server.
+
+After restore or reconnect, helper commands prefer the current '$NVIM' socket
+and can fall back to tmux's updated socket when the local socket is stale. If an
+old shell is missing helper functions or PATH updates, source the current RC
+file:
+>
+  # Run this in old shells to update their connection
+  source $(tmux show-environment -g NEOMUX_RC 2>/dev/null | cut -d= -f2)
+<
+Tmux public functions: ~
+
+- 'NeomuxTmuxSocket()' - Returns the current tmux socket path.
+
+- 'NeomuxTmuxSessionName()' - Returns the current session name.
+
+- 'NeomuxTmuxListSessions()' - Returns a list of active neomux tmux sessions.
+
+- 'NeomuxTmuxKillServer()' - Kills the tmux server.
+
+- 'NeomuxTmuxReconnect(name)' - Reconnects to a session by name.
+
+- 'NeomuxTmuxReconnectPicker()' - Opens the reconnect picker.
+
+- 'NeomuxTmuxClean()' - Cleans up reattached session markers.
+
+- 'NeomuxTerminalName([bufnr])' - Returns the terminal name for a buffer.
+
+- 'NeomuxIsTerminal([bufnr])' - Returns true if buffer is a neomux terminal.
+
+- 'NeomuxRenameTerminal(name)' - Renames the current terminal.
 
 -------------------------------------------------------------------------------
                                            *neomux-miscellanea-troubleshooting*
@@ -404,12 +536,12 @@ Miscellanea / troubleshooting ~
 - If you want a simple way to send keys to a neomux terminal session you can
   do so via the 'NeomuxSend(keys)' function.
 
-- Neomux relies heavily on the excellent neovim-remote [1], and includes
-  amd64 binaries for neovim-remote for MacOS and Linux as they are the most
-  popular platforms. If you're on Windows or using another chipset (e.g.
-  Raspberry pi/ARM) you will need to install python and 'pip' manually, and
-  then install neovim-remote via 'pip install neovim-remote' before neomux
-  will work.
+- Neomux uses nvr-go [11] or neovim-remote [1] to communicate with neovim from
+  shell sessions. On first run, neomux automatically downloads the appropriate
+  nvr-go binary for your platform. If automatic download fails, install
+  neovim-remote manually with 'pip install neovim-remote' or download nvr-go
+  from releases and place it in 'plugin/bin/nvr'. You can retry automatic
+  installation with ':NeomuxInstallNvr'.
 
 ===============================================================================
                                                             *neomux-references*
@@ -425,5 +557,6 @@ References ~
 [8] https://www.brianstorti.com/vim-registers/
 [9] https://github.com/vim-airline/vim-airline
 [10] https://github.com/neovim/neovim/issues/20380
+[11] https://github.com/nikvdp/nvr-go/releases
 
 vim: ft=help

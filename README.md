@@ -26,10 +26,12 @@ For more info see the [tutorial](#tutorial).
 
 # Installation
 
-1. Install neovim. 
+1. Install neovim.
 2. Install this plugin into neovim via your favorite plugin manager
    ([vim-plug][vim-plug] is a good place to start)
-3. (Optional, for speed) install [neovim-remote][neovim-remote].
+3. Neomux will automatically download [nvr-go](https://github.com/nikvdp/nvr-go/releases)
+   on first run. For offline installation or manual setup, install [neovim-remote][neovim-remote]
+   via `pip install neovim-remote` or download nvr-go from releases.
 
 
 # Usage
@@ -44,7 +46,7 @@ you're editing and your shell(s) painless. Files and shells are both
 first-class citizens, and all the tools you need to pass data between neovim
 and your shell are included.
 
-## Basics 
+## Basics
 You can start a neomux shell in a neovim window with `:Neomux` or with
 the mapping `<Leader>sh`.
 
@@ -54,19 +56,19 @@ the mapping `<Leader>sh`.
 >
 > Neomux will automatically tell the shell to use your current neovim session as
 > the default editor via the `$EDITOR` shell variable. This means that tools like
-> `git` and `kubectl` will open files in your existing neovim session. Make sure you 
+> `git` and `kubectl` will open files in your existing neovim session. Make sure you
 > use neovim's `:bd` (buffer delete) command when you are finished editing your
 > files to notify the calling program you are done -- this is equivalent to
-> closing a non-neomux editor. 
+> closing a non-neomux editor.
 
 
 
 ## Window navigation
 
 After installing neovim you will notice that every window in vim now shows a numeric
-identifier in it's status bar that looks like this: 
+identifier in it's status bar that looks like this:
 
-``` 
+```
 ∥ W:1 ∥
 ```
 
@@ -77,7 +79,7 @@ individual windows in neomux.
 
 Neomux adds some new key mappings to make working with windows easier.  The
 default keybindings can be customized from your `vimrc` / `init.vim`, see
-[customization](#customization) for more info. 
+[customization](#customization) for more info.
 
 In the default settings some commands are accessed via the `<Leader>` key (`\`
 on a vanilla neovim install):
@@ -115,14 +117,14 @@ some handy new shell commands.
 The simplest of the new neomux shell commands are `s`, `vs` and `t`. These
 stand for `s`plit, `v`ertical-`s`plit, and `t`ab, and are straightforward to use.
 
-If you have a neomux shell open and wanted to open a file you were looking at 
+If you have a neomux shell open and wanted to open a file you were looking at
 in a *new* window, you would simply do:
 
 ``` sh
 s <some-file>
 ```
 
-Similarly, `vs <some-file>`, and `t <some-file>` would open `<some-file>` in 
+Similarly, `vs <some-file>`, and `t <some-file>` would open `<some-file>` in
 a vertical split, or a new tab, respectively.
 
 
@@ -140,7 +142,7 @@ a vertical split, or a new tab, respectively.
 One of the most commonly used neomux commands is `vw` (vim-window), it allows
 you to open a file in an *already open* window.
 
-For example if you have 3 windows open in your current nvim session/tab and you 
+For example if you have 3 windows open in your current nvim session/tab and you
 wanted to open a file named `my-file.txt` in the 2nd window you'd do:
 
 ``` sh
@@ -149,7 +151,7 @@ vw 2 my-file.txt
 
 You can also use pass `-` as the filename to stream the contents of `stdin`
 into a vim-window, which when combined with the shell's `|` characters makes
-for some interesting possibilities. 
+for some interesting possibilities.
 
 The `vwp` (vim-window-print) command does the reverse of the `vw` command. It
 takes the contents of any vim window and streams it out to standard out. When
@@ -175,7 +177,7 @@ topic][vim-registers-docs] and/or [this tutorial][vim-registers-tut].
 Both `vc` and `vp`, work on the default register (`@"`) if no register is
 specified.  To work with a specific register just pass it as the first cmd-line
 param. For example, to work with register `a` (`@a`), you would use `vw a`, and
-`vp a`. 
+`vp a`.
 
 To put data in a register pipe it in via stdin:
 
@@ -187,10 +189,10 @@ And get it out with `vp`:
 
 ``` sh
 $ vp a
-This is what's in register a. 
+This is what's in register a.
 ```
 
-All vim register semantics are preserved, so you can append to the contents of a 
+All vim register semantics are preserved, so you can append to the contents of a
 register by capitalizing the register name:
 
 ``` sh
@@ -202,7 +204,7 @@ This is what's in register a. Appended to register a.
 Special registers such as `/` and `+` work just like any other register, so
 you could even use these as a roundabout way to replace `pbpaste` / `xsel` by
 using `vp +` (although this is silly since at the end of the day neovim will
-probably call those same tools to retrieve the clipboard). 
+probably call those same tools to retrieve the clipboard).
 
 # CLI helper reference
 
@@ -210,13 +212,13 @@ When you start a neomux shell some new helper commands will be available to you
 to streamline working with neovim.
 
 
-- ### `vw <win_num> <file>` 
+- ### `vw <win_num> <file>`
 
   Open `<file>` in vim window number `<win_num>`, where `<win_num>` is a number
   between 1 and 9. For example:
 
   ``` bash
-  vw 2 ~/.config/nvim/init.vim 
+  vw 2 ~/.config/nvim/init.vim
   ```
 
   Would open your neovim config in window 2.
@@ -228,17 +230,17 @@ to streamline working with neovim.
   ``` bash
   ls | vw 2 -
   ```
-- ### `vws <win_num> <file>` 
+- ### `vws <win_num> <file>`
   Like `vw`, but perform a horizontal split on `<win_num>` before opening `<file>` there.
 
-- ### `vc [register]` 
+- ### `vc [register]`
   copy data into a vim register (`@"` if no register specified). Example:
 
   ``` bash
   ls | vc a
   ```
 
-  Would put the listing of files in the shell's working directory into vim register `a`, 
+  Would put the listing of files in the shell's working directory into vim register `a`,
   which you could then paste in vim by doing e.g. `"aP`
 
 - ### `vp [register]`
@@ -262,14 +264,14 @@ to streamline working with neovim.
 # Cookbook
 
 - A useful pattern is to combine `vw`, `vp`, and `xargs` to do
-  operations over sets of files. For example, if you wanted to delete all files in a folder 
+  operations over sets of files. For example, if you wanted to delete all files in a folder
   except for file `b`, you could do:
 
   ``` bash
   ls | vw 2 -
   ...edit the file list in nvim and delete `b`...
   ...select all files and yank to the `@"` register with `ggVGy`...
-  vp | xargs rm  # 
+  vp | xargs rm  #
   ```
 -->
 
@@ -277,12 +279,12 @@ to streamline working with neovim.
 # Customization
 
 Neomux comes with a sane set of defaults, but it's meant to get out of your
-way, so much of it's behavior is configurable. 
+way, so much of it's behavior is configurable.
 
 Configure neomux by setting any of these variables in your `.vimrc` / `init.vim`:
 
 
-### Key bindings: 
+### Key bindings:
 
 - `g:neomux_start_term_map` - Default: `<Leader>sh`. This map controls what
   keys start a new Neomux term in the current window.
@@ -293,8 +295,8 @@ Configure neomux by setting any of these variables in your `.vimrc` / `init.vim`
 - `g:neomux_winjump_map_prefix` - Default: `<C-w>`. In Neomux you
   can jump to any open window by hitting `<C-w><win_num>` (e.g. `<C-w>2` jumps to
   window 2. Change this if you want to jump to a different window with a
-  different mapping. 
-  
+  different mapping.
+
   > **NOTE:** this is a prefix map, so whatever key you specify will
   > have 9 new mappings generated, one for each window. E.g. if you change this to
   > `<C-b>`, you would hit `<C-b>2` to move to window 2.
@@ -321,7 +323,7 @@ Configure neomux by setting any of these variables in your `.vimrc` / `init.vim`
 - `g:neomux_win_num_status` - Default: `∥ W:[%{WindowNumber()}] ∥`. By default
   Neomux adds decorations that look like `∥ W:1 ∥` to each window. If you'd like
   to customize this, set this variable to a different value. `%{WindowNumber()}`
-  will be replaced by the window number itself. 
+  will be replaced by the window number itself.
 
   If you have [airline](https://github.com/vim-airline/vim-airline) installed
   neomux will attempt to add it to your airline. If this doesn't work for you
@@ -343,26 +345,211 @@ Configure neomux by setting any of these variables in your `.vimrc` / `init.vim`
   neovim's default `<C-\><C-n>`, you can disable it by setting
   `g:neomux_no_exit_term_map` to `1`.
 
-- `g:neomux_hitenter_fix` - There is 
+- `g:neomux_hitenter_fix` - There is
   [a neovim issue](https://github.com/neovim/neovim/issues/20380) when using
   `cmdheight=0` that causes hit-enter confirmations in neovim when any of the
   `g:neomux_start_term_*map` keys are executed. Until the upstream issue is
   fixed, you can work around it by setting `g:neomux_hitenter_fix` to `1`.
 
+### Tmux integration
+
+Neomux can optionally wrap terminals in persistent [tmux][tmux] sessions, making
+your shell sessions survive neovim crashes and restarts.
+
+#### Why use tmux integration?
+
+Without tmux, your shell sessions die when neovim exits. With tmux integration:
+- **Crash recovery**: If neovim crashes, your shells keep running in tmux
+- **Session persistence**: Close neovim, reopen later, reconnect to same shells
+- **Auto-save**: Session layouts save after editor activity with a configurable debounce
+- **Named sessions**: Give sessions memorable names, reconnect by name
+
+#### How it works
+
+When tmux integration is enabled, each `:Neomux` terminal runs inside its own
+tmux session named like `nmux_0`, `nmux_1`, etc. All those terminal sessions
+belong to one neomux session (named like `myproject_wonderland`) and one tmux
+server socket under `g:neomux_tmux_cache_dir`. The session name shows in your
+statusline.
+
+Neomux stores terminal names in tmux window names, writes reconnect helper RC
+files beside the tmux socket, and saves layout JSON in the tmux environment as
+`NEOMUX_SESSION_STATE`.
+
+If neovim exits (crash or normal quit), the tmux sessions keep running in the
+background. Start neovim again and use `:NeomuxRestoreSession` to restore your
+saved layout and reconnect terminals. Use `:NeomuxTmuxReconnect` only when you
+want to attach the running terminals without recreating the saved window layout.
+
+#### Setup
+
+Add to your `init.vim`:
+
+```vim
+let g:neomux_enable_tmux = 1
+```
+
+That's it! Now `:Neomux` creates persistent terminals.
+
+#### Basic usage
+
+1. **Start terminals**: `:Neomux` works the same, but terminals now persist
+2. **Name your session** (optional): `:NeomuxRenameSession myproject`
+3. **Work normally**: Auto-save saves your layout after editor activity
+4. **Close neovim**: Your shells keep running in tmux
+5. **Restore later**: Start neovim, run `:NeomuxRestoreSession`, pick your session
+
+Your window splits, terminal names, and command history all come back exactly as
+you left them.
+
+**Restore vs Reconnect:**
+- **`:NeomuxRestoreSession`** - Restores your saved window layout (splits, positions)
+  AND reconnects terminals. Use this 99% of the time - it brings back everything.
+- **`:NeomuxTmuxReconnect`** - Only reconnects terminals, doesn't restore layout.
+  Use this if you just want the running shells without recreating splits.
+
+#### Tmux configuration options
+
+- `g:neomux_enable_tmux` - Default: `0`. Set to `1` to enable tmux integration.
+- `g:neomux_tmux_cache_dir` - Default: `~/.cache/neomux`. Directory for tmux
+  socket files and generated shell RC files.
+- `g:neomux_tmux_session_name` - Default: auto-generated. Override the
+  auto-generated session name.
+- `g:neomux_tmux_autosave_interval` - Default: `30`. Debounce window in seconds
+  for event-driven automatic session saves. Set to `0` to disable autosave.
+  Autosave runs silently in the background and allows session recovery if neovim
+  crashes.
+
+#### Tmux keybindings (only active when tmux is enabled)
+
+- `g:neomux_tmux_kill_map` - Default: `<Leader>nk`. Kill the tmux server.
+- `g:neomux_tmux_quit_map` - Default: `<Leader>nq`. Kill tmux server and quit vim.
+- `g:neomux_tmux_reconnect_map` - Default: `<Leader>nr`. Open reconnect picker.
+- `g:neomux_rename_term_map` - Default: `<Leader>nn`. Rename current terminal.
+- `g:neomux_terminal_name_prefix` - Default: `neomux://`. Prefix for neovim
+  buffer names.
+
+#### Terminal naming
+
+When tmux integration is enabled, neomux synchronizes terminal names between
+tmux and neovim, with tmux as the source of truth:
+
+- New terminals are automatically named based on the current directory
+- Names are stored in tmux window names and reflected in neovim buffer names
+- Use `:NeomuxRenameTerminal <name>` or `<Leader>nn` to rename terminals
+- Names are preserved and restored when reconnecting to orphaned sessions
+
+#### Tmux commands
+
+**Session management (what you use most):**
+- `:NeomuxRestoreSession [name]` - Restore saved session with layout (use this after restart)
+- `:NeomuxSaveSession` - Manually save session (autosave normally handles this)
+- `:NeomuxRenameSession <name>` - Give session a memorable name
+- `:NeomuxRenameSessionPrompt` - Prompt for session name
+
+**Terminal management:**
+- `:NeomuxRenameTerminal <name>` - Rename current terminal
+- `:NeomuxRenameTerminalPrompt` - Prompt for terminal name
+
+**Advanced/less common:**
+- `:NeomuxTmuxReconnect` - Reconnect terminals without restoring layout
+- `:NeomuxTmuxReconnectTo <name>` - Reconnect to specific session by name
+- `:NeomuxTmuxKill` - Kill the tmux server for current session
+- `:NeomuxTmuxClean` - Clean up orphaned session markers
+
+#### Common workflows
+
+**Rename your session for easy reconnection:**
+```vim
+:NeomuxRenameSession myproject
+```
+Now the session appears as "myproject" in the reconnect picker.
+
+**Rename individual terminals:**
+```vim
+:NeomuxRenameTerminal server    " or press <Leader>nn
+```
+Terminal names show in buffer names and are preserved across reconnects.
+
+**Manually save session:**
+```vim
+:NeomuxSaveSession
+```
+Though auto-save normally handles this, you can force a save before risky operations.
+
+**Restore your session after closing neovim:**
+```vim
+:NeomuxRestoreSession          " Pick from list - restores layout + terminals
+```
+
+**Or just reconnect terminals without layout:**
+```vim
+:NeomuxTmuxReconnect           " Press <Leader>nr - terminals only
+```
+
+Sessions are sorted by most recent first. Use restore (not reconnect) to get your
+full layout back.
+
+#### Refreshing stale shell environments
+
+If you have an existing shell inside a neomux tmux session that was started
+before neomux wrote its helper environment, you can refresh it by sourcing the
+neomux RC file. Add this alias to your `.bashrc` or `.zshrc`:
+
+```bash
+alias nxr='source $(tmux show-environment -g NEOMUX_RC 2>/dev/null | cut -d= -f2)'
+```
+
+Then run `nxr` in any shell inside a neomux tmux session to refresh the environment.
+This sets up `$NVIM`, `$PATH` (to include neomux tools), and sources the helper
+functions (`e`, `s`, `vs`, `t`, `vw`, etc.).
+
+#### What happens after a crash?
+
+If neovim crashes, your shells keep running in tmux but lose their connection.
+Auto-save keeps your latest layout saved as you move through windows, buffers,
+and tabs.
+
+Just restart neovim and run:
+```vim
+:NeomuxRestoreSession
+```
+
+Your layout, terminals, and command history all come back. The helper functions
+prefer the current `$NVIM` socket and can fall back to tmux's updated socket
+after restore/reconnect. If an old shell is missing helper functions or PATH
+updates, run `nxr` in that shell to source the current neomux RC file.
+
+#### Tmux public functions
+
+- `NeomuxTmuxSocket()` - Returns the current tmux socket path.
+- `NeomuxTmuxSessionName()` - Returns the current internal session name.
+- `NeomuxSessionDisplayName()` - Returns the session display name (or internal name if not set).
+- `NeomuxTmuxListSessions()` - Returns a list of active neomux tmux sessions (internal names).
+- `NeomuxTmuxKillServer()` - Kills the tmux server.
+- `NeomuxTmuxReconnect(name)` - Reconnects to a session by name.
+- `NeomuxTmuxReconnectPicker()` - Opens the reconnect picker.
+- `NeomuxTmuxClean()` - Cleans up reattached session markers.
+- `NeomuxTerminalName([bufnr])` - Returns the terminal name for a buffer.
+- `NeomuxIsTerminal([bufnr])` - Returns true if buffer is a neomux terminal.
+- `NeomuxRenameTerminal(name)` - Renames the current terminal.
+- `NeomuxRenameSession(name)` - Sets the session display name.
+
 ### Miscellanea / troubleshooting
 
 - If you want a simple way to send keys to a neomux terminal session you can do
-  so via the `NeomuxSend(keys)` function. 
+  so via the `NeomuxSend(keys)` function.
 
-- Neomux relies heavily on the excellent [neovim-remote][neovim-remote], and
-  includes amd64 binaries for neovim-remote for MacOS and Linux as they are the
-  most popular platforms. If you're on Windows or using another chipset (e.g.
-  Raspberry pi/ARM) you will need to install python and `pip` manually, and
-  then install neovim-remote via `pip install neovim-remote` before neomux will
-  work.
+- Neomux uses [nvr-go](https://github.com/nikvdp/nvr-go/releases) or
+  [neovim-remote][neovim-remote] to communicate with neovim from shell sessions.
+  On first run, neomux automatically downloads the appropriate nvr-go binary for
+  your platform (darwin/linux, amd64/arm64/armv7). If automatic download fails
+  (offline, firewall, etc.), install manually via `pip install neovim-remote` or
+  download nvr-go from releases and place in `plugin/bin/nvr`. You can retry
+  automatic installation with `:NeomuxInstallNvr`.
 
 
-[vim-plug]: https://github.com/junegunn/vim-plug 
+[vim-plug]: https://github.com/junegunn/vim-plug
 [tmux]: https://github.com/tmux/tmux
 [neovim-remote]: https://github.com/mhinz/neovim-remote
 [vim-registers-docs]: http://vimdoc.sourceforge.net/htmldoc/change.html#registers

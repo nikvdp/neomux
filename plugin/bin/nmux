@@ -1,2 +1,14 @@
 #!/usr/bin/env bash
-exec nvr -cc vsplit --remote-wait "$@"
+SCRIPT_LOCATION="$( cd "$( dirname "$0" )" && pwd )"
+source "$SCRIPT_LOCATION/funcs.sh"
+
+# Check if we're inside a neomux session (NVIM socket exists and is valid)
+socket=$(get_nvim_socket)
+if [ -n "$socket" ] && [ -S "$socket" ]; then
+    # Inside neomux - use nvr to open in vsplit
+    nvr_cmd -cc vsplit --remote-wait "$@"
+    exit $?
+else
+    # Outside neomux - start new neovim with Neomux
+    exec nvim +Neomux "$@"
+fi
