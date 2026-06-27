@@ -1,8 +1,12 @@
 # Neomux - control Neovim from shells running inside Neovim.
 
-Neomux packages and wraps [neovim-remote][neovim-remote] goodness into your
-neovim terminals so you can work with neovim's `:term` emulator in some
-interesting new ways. Here's some of the things it lets you do:
+Neomux gives shells inside neovim a neovim-remote-style control surface so you
+can work with neovim's `:term` emulator in some interesting new ways. It now
+uses [nvr-go](https://github.com/nikvdp/nvr-go/releases), a small
+reimplementation of the `nvr` command surface Neomux needs, instead of wrapping
+the Python [neovim-remote][neovim-remote] package by default.
+
+Here's some of the things it lets you do:
 
 - Pipe commands from the shell into a neovim window (and back to the shell) via stdin/stdout
 - Easily jump to any neovim windows with 3 keystrokes, even when you have lots of
@@ -30,8 +34,10 @@ For more info see the [tutorial](#tutorial).
 2. Install this plugin into neovim via your favorite plugin manager
    ([vim-plug][vim-plug] is a good place to start)
 3. Neomux will automatically download [nvr-go](https://github.com/nikvdp/nvr-go/releases)
-   on first run. For offline installation or manual setup, install [neovim-remote][neovim-remote]
-   via `pip install neovim-remote` or download nvr-go from releases.
+   on first run. For offline installation or manual setup, download nvr-go from
+   releases and place it at `plugin/bin/nvr`. If you already have a compatible
+   `nvr` executable on `$PATH`, such as Python [neovim-remote][neovim-remote],
+   Neomux will use that instead.
 
 
 # Usage
@@ -540,13 +546,15 @@ updates, run `nxr` in that shell to source the current neomux RC file.
 - If you want a simple way to send keys to a neomux terminal session you can do
   so via the `NeomuxSend(keys)` function.
 
-- Neomux uses [nvr-go](https://github.com/nikvdp/nvr-go/releases) or
-  [neovim-remote][neovim-remote] to communicate with neovim from shell sessions.
-  On first run, neomux automatically downloads the appropriate nvr-go binary for
-  your platform (darwin/linux, amd64/arm64/armv7). If automatic download fails
-  (offline, firewall, etc.), install manually via `pip install neovim-remote` or
-  download nvr-go from releases and place in `plugin/bin/nvr`. You can retry
-  automatic installation with `:NeomuxInstallNvr`.
+- Neomux uses [nvr-go](https://github.com/nikvdp/nvr-go/releases), its bundled
+  reimplementation of the `nvr` command surface it needs, to communicate with
+  neovim from shell sessions. On first run, neomux automatically downloads the
+  appropriate nvr-go binary for your platform (darwin/linux, amd64/arm64/armv7).
+  If automatic download fails (offline, firewall, etc.), download nvr-go from
+  releases and place it at `plugin/bin/nvr`. You can also use a compatible
+  external `nvr` executable on `$PATH`, including Python
+  [neovim-remote][neovim-remote]. You can retry automatic installation with
+  `:NeomuxInstallNvr`.
 
 
 [vim-plug]: https://github.com/junegunn/vim-plug
