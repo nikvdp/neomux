@@ -26,10 +26,10 @@ For more info see the [tutorial](#tutorial).
 
 # Installation
 
-1. Install neovim. 
+1. Install neovim.
 2. Install this plugin into neovim via your favorite plugin manager
    ([vim-plug][vim-plug] is a good place to start)
-3. Neomux will automatically download [nvr-go](https://github.com/nikvdp/neomux/releases) 
+3. Neomux will automatically download [nvr-go](https://github.com/nikvdp/nvr-go/releases)
    on first run. For offline installation or manual setup, install [neovim-remote][neovim-remote]
    via `pip install neovim-remote` or download nvr-go from releases.
 
@@ -46,7 +46,7 @@ you're editing and your shell(s) painless. Files and shells are both
 first-class citizens, and all the tools you need to pass data between neovim
 and your shell are included.
 
-## Basics 
+## Basics
 You can start a neomux shell in a neovim window with `:Neomux` or with
 the mapping `<Leader>sh`.
 
@@ -56,19 +56,19 @@ the mapping `<Leader>sh`.
 >
 > Neomux will automatically tell the shell to use your current neovim session as
 > the default editor via the `$EDITOR` shell variable. This means that tools like
-> `git` and `kubectl` will open files in your existing neovim session. Make sure you 
+> `git` and `kubectl` will open files in your existing neovim session. Make sure you
 > use neovim's `:bd` (buffer delete) command when you are finished editing your
 > files to notify the calling program you are done -- this is equivalent to
-> closing a non-neomux editor. 
+> closing a non-neomux editor.
 
 
 
 ## Window navigation
 
 After installing neovim you will notice that every window in vim now shows a numeric
-identifier in it's status bar that looks like this: 
+identifier in it's status bar that looks like this:
 
-``` 
+```
 ∥ W:1 ∥
 ```
 
@@ -79,7 +79,7 @@ individual windows in neomux.
 
 Neomux adds some new key mappings to make working with windows easier.  The
 default keybindings can be customized from your `vimrc` / `init.vim`, see
-[customization](#customization) for more info. 
+[customization](#customization) for more info.
 
 In the default settings some commands are accessed via the `<Leader>` key (`\`
 on a vanilla neovim install):
@@ -117,14 +117,14 @@ some handy new shell commands.
 The simplest of the new neomux shell commands are `s`, `vs` and `t`. These
 stand for `s`plit, `v`ertical-`s`plit, and `t`ab, and are straightforward to use.
 
-If you have a neomux shell open and wanted to open a file you were looking at 
+If you have a neomux shell open and wanted to open a file you were looking at
 in a *new* window, you would simply do:
 
 ``` sh
 s <some-file>
 ```
 
-Similarly, `vs <some-file>`, and `t <some-file>` would open `<some-file>` in 
+Similarly, `vs <some-file>`, and `t <some-file>` would open `<some-file>` in
 a vertical split, or a new tab, respectively.
 
 
@@ -142,7 +142,7 @@ a vertical split, or a new tab, respectively.
 One of the most commonly used neomux commands is `vw` (vim-window), it allows
 you to open a file in an *already open* window.
 
-For example if you have 3 windows open in your current nvim session/tab and you 
+For example if you have 3 windows open in your current nvim session/tab and you
 wanted to open a file named `my-file.txt` in the 2nd window you'd do:
 
 ``` sh
@@ -151,7 +151,7 @@ vw 2 my-file.txt
 
 You can also use pass `-` as the filename to stream the contents of `stdin`
 into a vim-window, which when combined with the shell's `|` characters makes
-for some interesting possibilities. 
+for some interesting possibilities.
 
 The `vwp` (vim-window-print) command does the reverse of the `vw` command. It
 takes the contents of any vim window and streams it out to standard out. When
@@ -177,7 +177,7 @@ topic][vim-registers-docs] and/or [this tutorial][vim-registers-tut].
 Both `vc` and `vp`, work on the default register (`@"`) if no register is
 specified.  To work with a specific register just pass it as the first cmd-line
 param. For example, to work with register `a` (`@a`), you would use `vw a`, and
-`vp a`. 
+`vp a`.
 
 To put data in a register pipe it in via stdin:
 
@@ -189,10 +189,10 @@ And get it out with `vp`:
 
 ``` sh
 $ vp a
-This is what's in register a. 
+This is what's in register a.
 ```
 
-All vim register semantics are preserved, so you can append to the contents of a 
+All vim register semantics are preserved, so you can append to the contents of a
 register by capitalizing the register name:
 
 ``` sh
@@ -204,7 +204,7 @@ This is what's in register a. Appended to register a.
 Special registers such as `/` and `+` work just like any other register, so
 you could even use these as a roundabout way to replace `pbpaste` / `xsel` by
 using `vp +` (although this is silly since at the end of the day neovim will
-probably call those same tools to retrieve the clipboard). 
+probably call those same tools to retrieve the clipboard).
 
 # CLI helper reference
 
@@ -212,13 +212,13 @@ When you start a neomux shell some new helper commands will be available to you
 to streamline working with neovim.
 
 
-- ### `vw <win_num> <file>` 
+- ### `vw <win_num> <file>`
 
   Open `<file>` in vim window number `<win_num>`, where `<win_num>` is a number
   between 1 and 9. For example:
 
   ``` bash
-  vw 2 ~/.config/nvim/init.vim 
+  vw 2 ~/.config/nvim/init.vim
   ```
 
   Would open your neovim config in window 2.
@@ -230,17 +230,17 @@ to streamline working with neovim.
   ``` bash
   ls | vw 2 -
   ```
-- ### `vws <win_num> <file>` 
+- ### `vws <win_num> <file>`
   Like `vw`, but perform a horizontal split on `<win_num>` before opening `<file>` there.
 
-- ### `vc [register]` 
+- ### `vc [register]`
   copy data into a vim register (`@"` if no register specified). Example:
 
   ``` bash
   ls | vc a
   ```
 
-  Would put the listing of files in the shell's working directory into vim register `a`, 
+  Would put the listing of files in the shell's working directory into vim register `a`,
   which you could then paste in vim by doing e.g. `"aP`
 
 - ### `vp [register]`
@@ -264,14 +264,14 @@ to streamline working with neovim.
 # Cookbook
 
 - A useful pattern is to combine `vw`, `vp`, and `xargs` to do
-  operations over sets of files. For example, if you wanted to delete all files in a folder 
+  operations over sets of files. For example, if you wanted to delete all files in a folder
   except for file `b`, you could do:
 
   ``` bash
   ls | vw 2 -
   ...edit the file list in nvim and delete `b`...
   ...select all files and yank to the `@"` register with `ggVGy`...
-  vp | xargs rm  # 
+  vp | xargs rm  #
   ```
 -->
 
@@ -279,12 +279,12 @@ to streamline working with neovim.
 # Customization
 
 Neomux comes with a sane set of defaults, but it's meant to get out of your
-way, so much of it's behavior is configurable. 
+way, so much of it's behavior is configurable.
 
 Configure neomux by setting any of these variables in your `.vimrc` / `init.vim`:
 
 
-### Key bindings: 
+### Key bindings:
 
 - `g:neomux_start_term_map` - Default: `<Leader>sh`. This map controls what
   keys start a new Neomux term in the current window.
@@ -295,8 +295,8 @@ Configure neomux by setting any of these variables in your `.vimrc` / `init.vim`
 - `g:neomux_winjump_map_prefix` - Default: `<C-w>`. In Neomux you
   can jump to any open window by hitting `<C-w><win_num>` (e.g. `<C-w>2` jumps to
   window 2. Change this if you want to jump to a different window with a
-  different mapping. 
-  
+  different mapping.
+
   > **NOTE:** this is a prefix map, so whatever key you specify will
   > have 9 new mappings generated, one for each window. E.g. if you change this to
   > `<C-b>`, you would hit `<C-b>2` to move to window 2.
@@ -323,7 +323,7 @@ Configure neomux by setting any of these variables in your `.vimrc` / `init.vim`
 - `g:neomux_win_num_status` - Default: `∥ W:[%{WindowNumber()}] ∥`. By default
   Neomux adds decorations that look like `∥ W:1 ∥` to each window. If you'd like
   to customize this, set this variable to a different value. `%{WindowNumber()}`
-  will be replaced by the window number itself. 
+  will be replaced by the window number itself.
 
   If you have [airline](https://github.com/vim-airline/vim-airline) installed
   neomux will attempt to add it to your airline. If this doesn't work for you
@@ -345,7 +345,7 @@ Configure neomux by setting any of these variables in your `.vimrc` / `init.vim`
   neovim's default `<C-\><C-n>`, you can disable it by setting
   `g:neomux_no_exit_term_map` to `1`.
 
-- `g:neomux_hitenter_fix` - There is 
+- `g:neomux_hitenter_fix` - There is
   [a neovim issue](https://github.com/neovim/neovim/issues/20380) when using
   `cmdheight=0` that causes hit-enter confirmations in neovim when any of the
   `g:neomux_start_term_*map` keys are executed. Until the upstream issue is
@@ -528,9 +528,9 @@ run `nxr` in each shell to refresh the neomux environment variables.
 ### Miscellanea / troubleshooting
 
 - If you want a simple way to send keys to a neomux terminal session you can do
-  so via the `NeomuxSend(keys)` function. 
+  so via the `NeomuxSend(keys)` function.
 
-- Neomux uses [nvr-go](https://github.com/nikvdp/neomux/releases) or 
+- Neomux uses [nvr-go](https://github.com/nikvdp/nvr-go/releases) or
   [neovim-remote][neovim-remote] to communicate with neovim from shell sessions.
   On first run, neomux automatically downloads the appropriate nvr-go binary for
   your platform (darwin/linux, amd64/arm64/armv7). If automatic download fails
@@ -539,7 +539,7 @@ run `nxr` in each shell to refresh the neomux environment variables.
   automatic installation with `:NeomuxInstallNvr`.
 
 
-[vim-plug]: https://github.com/junegunn/vim-plug 
+[vim-plug]: https://github.com/junegunn/vim-plug
 [tmux]: https://github.com/tmux/tmux
 [neovim-remote]: https://github.com/mhinz/neovim-remote
 [vim-registers-docs]: http://vimdoc.sourceforge.net/htmldoc/change.html#registers

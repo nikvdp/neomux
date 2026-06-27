@@ -70,7 +70,9 @@ Installation ~
 1. Install neovim.
 2. Install this plugin into neovim via your favorite plugin manager (vim-
    plug [3] is a good place to start)
-3. (Optional, for speed) install neovim-remote [1].
+3. Neomux will automatically download nvr-go [11] on first run. For offline
+   installation or manual setup, install neovim-remote [1] with
+   'pip install neovim-remote' or download nvr-go from releases.
 
 ===============================================================================
                                                                  *neomux-usage*
@@ -229,7 +231,7 @@ To put data in a register pipe it in via stdin:
 And get it out with 'vp':
 >
   $ vp a
-  This is what's in register a. 
+  This is what's in register a.
 <
 All vim register semantics are preserved, so you can append to the contents of
 a register by capitalizing the register name:
@@ -394,7 +396,7 @@ to configure your plugin manager to load neomux _after_ the airline plugin.**
   'g:neomux_no_exit_term_map' to '1'.
 
 - 'g:neomux_hitenter_fix' - There is an issue [10] when using 'cmdheight=0' that
-  causes hit-enter confirmations in neovim when any of the 
+  causes hit-enter confirmations in neovim when any of the
   'g:neomux_start_term_*map' keys are executed. Until the issue is fixed, you
   can work around it by setting 'g:neomux_hitenter_fix' to '1'.
 
@@ -450,7 +452,7 @@ tmux and neovim, with tmux as the source of truth:
 
 - New terminals are automatically named based on the current directory
 - Names are stored in tmux window names and reflected in neovim buffer names
-- Use ':NeomuxRename <name>' or '<Leader>nn' to rename terminals
+- Use ':NeomuxRenameTerminal <name>' or '<Leader>nn' to rename terminals
 - Names are preserved and restored when reconnecting to orphaned sessions
 
 Tmux commands: ~
@@ -463,9 +465,10 @@ Tmux commands: ~
 
 - ':NeomuxTmuxClean' - Clean up reattached session markers.
 
-- ':NeomuxRename <name>' - Rename the current terminal (syncs tmux and neovim).
+- ':NeomuxRenameTerminal <name>' - Rename the current terminal (syncs tmux and
+  neovim).
 
-- ':NeomuxRenamePrompt' - Prompt for a new terminal name.
+- ':NeomuxRenameTerminalPrompt' - Prompt for a new terminal name.
 
 Reconnecting to sessions: ~
 
@@ -508,7 +511,7 @@ Tmux public functions: ~
 
 - 'NeomuxIsTerminal([bufnr])' - Returns true if buffer is a neomux terminal.
 
-- 'NeomuxRename(name)' - Renames the current terminal.
+- 'NeomuxRenameTerminal(name)' - Renames the current terminal.
 
 -------------------------------------------------------------------------------
                                            *neomux-miscellanea-troubleshooting*
@@ -517,12 +520,12 @@ Miscellanea / troubleshooting ~
 - If you want a simple way to send keys to a neomux terminal session you can
   do so via the 'NeomuxSend(keys)' function.
 
-- Neomux relies heavily on the excellent neovim-remote [1], and includes
-  amd64 binaries for neovim-remote for MacOS and Linux as they are the most
-  popular platforms. If you're on Windows or using another chipset (e.g.
-  Raspberry pi/ARM) you will need to install python and 'pip' manually, and
-  then install neovim-remote via 'pip install neovim-remote' before neomux
-  will work.
+- Neomux uses nvr-go [11] or neovim-remote [1] to communicate with neovim from
+  shell sessions. On first run, neomux automatically downloads the appropriate
+  nvr-go binary for your platform. If automatic download fails, install
+  neovim-remote manually with 'pip install neovim-remote' or download nvr-go
+  from releases and place it in 'plugin/bin/nvr'. You can retry automatic
+  installation with ':NeomuxInstallNvr'.
 
 ===============================================================================
                                                             *neomux-references*
@@ -538,5 +541,6 @@ References ~
 [8] https://www.brianstorti.com/vim-registers/
 [9] https://github.com/vim-airline/vim-airline
 [10] https://github.com/neovim/neovim/issues/20380
+[11] https://github.com/nikvdp/nvr-go/releases
 
 vim: ft=help
