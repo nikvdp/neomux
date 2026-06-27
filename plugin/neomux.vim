@@ -691,12 +691,12 @@ function! s:WriteNeomuxRc(rc_file, nvim_socket) abort
     " This ensures PATH includes neomux bin folder and env vars are set
     let l:lines = [
         \ '# Neomux RC - source this in your shell for neomux integration',
-        \ printf('export PATH="%s:$PATH"', s:bin_folder),
-        \ printf('export NVIM="%s"', a:nvim_socket),
-        \ printf('export NVIM_LISTEN_ADDRESS="%s"', a:nvim_socket),
-        \ printf('export EDITOR="%s/nmux"', s:bin_folder),
-        \ printf('export NEOMUX_RC="%s"', a:rc_file),
-        \ printf('source "%s/funcs.sh"', s:bin_folder),
+        \ printf('export PATH=%s:"$PATH"', shellescape(s:bin_folder)),
+        \ printf('export NVIM=%s', shellescape(a:nvim_socket)),
+        \ printf('export NVIM_LISTEN_ADDRESS=%s', shellescape(a:nvim_socket)),
+        \ printf('export EDITOR=%s', shellescape(s:bin_folder . '/nmux')),
+        \ printf('export NEOMUX_RC=%s', shellescape(a:rc_file)),
+        \ printf('source %s', shellescape(s:bin_folder . '/funcs.sh')),
         \ ]
     call writefile(l:lines, a:rc_file)
 endfunction
@@ -947,20 +947,17 @@ function! NeomuxIsTerminal(...) abort
 endfunction
 
 function! NeomuxTmuxListSessions() abort
-    " List all active neomux tmux sessions by finding open sockets
+    " List all active neomux tmux sessions by checking socket files
     " Returns a list of internal session names, sorted by most recently modified first
     let l:sessions = []
 
-    " Use lsof to find tmux processes with neomux sockets
-    let l:lsof_cmd = printf("lsof -w -P -n -c tmux 2>/dev/null | grep '%s' | grep tmux-socket", g:neomux_tmux_cache_dir)
-    let l:output = system(l:lsof_cmd)
-
-    " Extract session names from socket paths
-    for l:line in split(l:output, "\n")
-        " Match the session name from path like: /path/to/cache/<session>.tmux-socket
-        let l:match = matchstr(l:line, g:neomux_tmux_cache_dir . '/\zs[^/]\+\ze\.tmux-socket')
-        if !empty(l:match) && index(l:sessions, l:match) < 0
-            call add(l:sessions, l:match)
+    for l:socket in globpath(g:neomux_tmux_cache_dir, '*.tmux-socket', 0, 1)
+        if !s:TmuxSocketIsAlive(l:socket)
+            continue
+        endif
+        let l:session = substitute(fnamemodify(l:socket, ':t'), '\.tmux-socket$', '', '')
+        if !empty(l:session) && index(l:sessions, l:session) < 0
+            call add(l:sessions, l:session)
         endif
     endfor
 
