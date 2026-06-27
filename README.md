@@ -361,7 +361,7 @@ your shell sessions survive neovim crashes and restarts.
 Without tmux, your shell sessions die when neovim exits. With tmux integration:
 - **Crash recovery**: If neovim crashes, your shells keep running in tmux
 - **Session persistence**: Close neovim, reopen later, reconnect to same shells
-- **Auto-save**: Session layouts saved every 30s (configurable)
+- **Auto-save**: Session layouts save after editor activity with a configurable debounce
 - **Named sessions**: Give sessions memorable names, reconnect by name
 
 #### How it works
@@ -388,7 +388,7 @@ That's it! Now `:Neomux` creates persistent terminals.
 
 1. **Start terminals**: `:Neomux` works the same, but terminals now persist
 2. **Name your session** (optional): `:NeomuxRenameSession myproject`
-3. **Work normally**: Auto-save runs every 30s, saving your layout
+3. **Work normally**: Auto-save saves your layout after editor activity
 4. **Close neovim**: Your shells keep running in tmux
 5. **Restore later**: Start neovim, run `:NeomuxRestoreSession`, pick your session
 
@@ -408,9 +408,10 @@ you left them.
   sockets and session files.
 - `g:neomux_tmux_session_name` - Default: auto-generated. Override the
   auto-generated session name.
-- `g:neomux_tmux_autosave_interval` - Default: `30`. Interval in seconds for
-  automatic session saves. Set to `0` to disable autosave. Autosave runs
-  silently in the background and allows session recovery if neovim crashes.
+- `g:neomux_tmux_autosave_interval` - Default: `30`. Debounce window in seconds
+  for event-driven automatic session saves. Set to `0` to disable autosave.
+  Autosave runs silently in the background and allows session recovery if neovim
+  crashes.
 
 #### Tmux keybindings (only active when tmux is enabled)
 
@@ -435,7 +436,7 @@ tmux and neovim, with tmux as the source of truth:
 
 **Session management (what you use most):**
 - `:NeomuxRestoreSession [name]` - Restore saved session with layout (use this after restart)
-- `:NeomuxSaveSession` - Manually save session (auto-saves every 30s anyway)
+- `:NeomuxSaveSession` - Manually save session (autosave normally handles this)
 - `:NeomuxRenameSession <name>` - Give session a memorable name
 - `:NeomuxRenameSessionPrompt` - Prompt for session name
 
@@ -467,7 +468,7 @@ Terminal names show in buffer names and are preserved across reconnects.
 ```vim
 :NeomuxSaveSession
 ```
-Though auto-save runs every 30s, you can force a save before risky operations.
+Though auto-save normally handles this, you can force a save before risky operations.
 
 **Restore your session after closing neovim:**
 ```vim
@@ -499,7 +500,8 @@ functions (`e`, `s`, `vs`, `t`, `vw`, etc.).
 #### What happens after a crash?
 
 If neovim crashes, your shells keep running in tmux but lose their connection.
-The auto-save (running every 30s) has your latest layout saved.
+Auto-save keeps your latest layout saved as you move through windows, buffers,
+and tabs.
 
 Just restart neovim and run:
 ```vim
